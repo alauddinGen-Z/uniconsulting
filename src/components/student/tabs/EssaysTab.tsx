@@ -587,10 +587,82 @@ export default function EssaysTab({ isLocked }: EssaysTabProps) {
                                 </div>
                             )}
 
-                            {/* Raw Feedback Fallback */}
+                            {/* Raw Feedback Fallback - Try to format nicely */}
                             {feedback.rawFeedback && (
-                                <div className="p-3 bg-slate-50 rounded-xl">
-                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{feedback.rawFeedback}</p>
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Info className="w-4 h-4 text-slate-500" />
+                                        <span className="font-medium text-slate-700 text-sm">AI Feedback</span>
+                                    </div>
+                                    {(() => {
+                                        // Try to parse JSON from rawFeedback
+                                        try {
+                                            const jsonMatch = feedback.rawFeedback.match(/\{[\s\S]*\}/);
+                                            if (jsonMatch) {
+                                                const parsed = JSON.parse(jsonMatch[0]);
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {parsed.overallComment && (
+                                                            <p className="text-slate-700 font-medium">{parsed.overallComment}</p>
+                                                        )}
+                                                        {parsed.strengths && parsed.strengths.length > 0 && (
+                                                            <div>
+                                                                <p className="font-bold text-green-700 text-sm mb-2">✓ Strengths</p>
+                                                                <ul className="space-y-2">
+                                                                    {parsed.strengths.map((s: { point: string; explanation: string }, i: number) => (
+                                                                        <li key={i} className="bg-green-50 p-2 rounded-lg text-sm">
+                                                                            <span className="font-medium text-green-900">{s.point}</span>
+                                                                            {s.explanation && <p className="text-green-700 text-xs mt-1">{s.explanation}</p>}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        {parsed.improvements && parsed.improvements.length > 0 && (
+                                                            <div>
+                                                                <p className="font-bold text-amber-700 text-sm mb-2">↑ Areas for Improvement</p>
+                                                                <ul className="space-y-2">
+                                                                    {parsed.improvements.map((imp: { issue: string; suggestion: string; priority?: string }, i: number) => (
+                                                                        <li key={i} className="bg-amber-50 p-2 rounded-lg text-sm">
+                                                                            <span className="font-medium text-amber-900">{imp.issue}</span>
+                                                                            {imp.suggestion && <p className="text-amber-700 text-xs mt-1">💡 {imp.suggestion}</p>}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        {parsed.coachingPrompts && parsed.coachingPrompts.length > 0 && (
+                                                            <div>
+                                                                <p className="font-bold text-indigo-700 text-sm mb-2">🤔 Questions to Consider</p>
+                                                                <ul className="space-y-1">
+                                                                    {parsed.coachingPrompts.map((prompt: string, i: number) => (
+                                                                        <li key={i} className="text-sm text-indigo-800 flex gap-2">
+                                                                            <span className="text-indigo-500 font-bold">{i + 1}.</span>
+                                                                            {prompt}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+                                            throw new Error("No JSON found");
+                                        } catch {
+                                            // If JSON parsing fails, display as formatted text
+                                            return (
+                                                <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                                    {feedback.rawFeedback
+                                                        .split('\n')
+                                                        .map((line, i) => (
+                                                            <p key={i} className={line.trim() === '' ? 'h-3' : 'mb-2'}>
+                                                                {line}
+                                                            </p>
+                                                        ))}
+                                                </div>
+                                            );
+                                        }
+                                    })()}
                                 </div>
                             )}
                         </div>

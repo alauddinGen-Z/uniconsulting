@@ -164,22 +164,42 @@ Return ONLY the JSON object, no other text.`;
         }
 
         const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        console.log("Raw Gemini response:", text.substring(0, 500));
 
-        // Parse JSON from response
+        // Parse JSON from response - handle various formats
         let feedback: AIFeedback;
         try {
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            // Step 1: Clean up the response - remove markdown code blocks if present
+            let cleanedText = text.trim();
+
+            // Remove ```json ... ``` or ``` ... ``` wrappers
+            cleanedText = cleanedText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
+
+            // Step 2: Try to find JSON object in the response
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                feedback = JSON.parse(jsonMatch[0]);
+                const jsonStr = jsonMatch[0];
+                feedback = JSON.parse(jsonStr);
+
+                // Validate required fields
+                if (typeof feedback.overallScore !== 'number') {
+                    feedback.overallScore = 5;
+                }
+                if (!feedback.overallComment || typeof feedback.overallComment !== 'string') {
+                    feedback.overallComment = "Review completed.";
+                }
+
+                console.log("Successfully parsed feedback with score:", feedback.overallScore);
             } else {
-                throw new Error("No JSON found in response");
+                throw new Error("No JSON object found in response");
             }
-        } catch (e) {
-            console.log("JSON parse failed, using raw feedback");
+        } catch (e: any) {
+            console.log("JSON parse failed:", e.message, "Using raw feedback");
+            // Fallback: extract key information from text
             feedback = {
                 overallScore: 5,
-                overallComment: "Analysis complete. See detailed feedback below.",
-                rawFeedback: text
+                overallComment: "Analysis complete. The AI provided feedback below.",
+                rawFeedback: text.replace(/```json?\s*/gi, '').replace(/```/g, '').trim()
             };
         }
 
