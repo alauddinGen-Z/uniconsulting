@@ -57,17 +57,33 @@ export default function ChatView({ userRole }: Props) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const supabase = createClient();
 
+    // Mark conversation as read by updating last_read_at
+    const markConversationAsRead = async (conversationId: string) => {
+        if (!currentUserId) return;
+        try {
+            await supabase
+                .from('conversation_participants')
+                .update({ last_read_at: new Date().toISOString() })
+                .eq('conversation_id', conversationId)
+                .eq('user_id', currentUserId);
+        } catch (error) {
+            console.error("Error marking conversation as read:", error);
+        }
+    };
+
     useEffect(() => {
         initializeChat();
     }, []);
 
     useEffect(() => {
-        if (selectedConversation) {
+        if (selectedConversation && currentUserId) {
             fetchMessages(selectedConversation.id);
+            // Mark conversation as read
+            markConversationAsRead(selectedConversation.id);
             const unsubscribe = subscribeToMessages(selectedConversation.id);
             return () => unsubscribe?.();
         }
-    }, [selectedConversation]);
+    }, [selectedConversation, currentUserId]);
 
     useEffect(() => {
         scrollToBottom();
@@ -642,13 +658,13 @@ export default function ChatView({ userRole }: Props) {
                                     key={student.id}
                                     onClick={() => toggleStudentSelection(student.id)}
                                     className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${selectedStudents.includes(student.id)
-                                            ? 'bg-purple-50 border-2 border-purple-500'
-                                            : 'border-2 border-transparent hover:bg-slate-50'
+                                        ? 'bg-purple-50 border-2 border-purple-500'
+                                        : 'border-2 border-transparent hover:bg-slate-50'
                                         }`}
                                 >
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${selectedStudents.includes(student.id)
-                                            ? 'bg-purple-500 text-white'
-                                            : 'bg-slate-100 text-slate-600'
+                                        ? 'bg-purple-500 text-white'
+                                        : 'bg-slate-100 text-slate-600'
                                         }`}>
                                         {selectedStudents.includes(student.id)
                                             ? <Check className="w-5 h-5" />

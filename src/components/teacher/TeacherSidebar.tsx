@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
+import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 
 interface TeacherSidebarProps {
     activeTab: string;
@@ -21,6 +22,7 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const router = useRouter();
     const supabase = createClient();
+    const { unreadCount } = useUnreadMessageCount();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -88,7 +90,15 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
                                 }`}
                         >
                             <div className="flex items-center gap-3 relative z-10">
-                                <item.icon className={`w-5 h-5 ${activeTab === item.id ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`} />
+                                <div className="relative">
+                                    <item.icon className={`w-5 h-5 ${activeTab === item.id ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`} />
+                                    {/* Unread Message Badge */}
+                                    {item.id === 'messages' && unreadCount > 0 && (
+                                        <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-lg">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
+                                </div>
                                 <span>{item.label}</span>
                                 {'hasAI' in item && item.hasAI && (
                                     <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${activeTab === item.id ? 'bg-white/20 text-white' : 'bg-purple-500/20 text-purple-400'
