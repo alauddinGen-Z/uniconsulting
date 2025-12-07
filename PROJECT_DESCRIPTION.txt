@@ -1,0 +1,809 @@
+================================================================================
+                    UNI CONSULTING - COMPLETE PROJECT DESCRIPTION
+================================================================================
+                           Created: December 5, 2024
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+Name: UNI Consulting (UniConsulting)
+Type: EdTech Platform / University Application Consulting CRM
+Purpose: A unified platform connecting ambitious students with expert mentors,
+         streamlining the university application process with AI-powered tools
+         and dedicated support for study abroad consulting.
+
+TECHNOLOGY STACK
+================================================================================
+Frontend Framework: Next.js 16.0.5 (App Router)
+UI Framework: React 19.2.0
+Styling: TailwindCSS 4 with custom theme
+State Management: Zustand 5.0.9, React Context API
+Backend/Database: Supabase (PostgreSQL + Auth + Storage + Realtime)
+Animation: Framer Motion 12.23.24
+Drag & Drop: @dnd-kit/core 6.3.1, @dnd-kit/sortable 10.0.0
+Icons: Lucide React 0.555.0
+Notifications: Sonner 2.0.7
+Language: TypeScript 5
+Font: Montserrat (headings), Inter (body)
+
+PROJECT STRUCTURE
+================================================================================
+
+d:\Project1\uniconsulting\uniconsulting\
+│
+├── src/
+│   ├── app/                          # Next.js App Router pages
+│   │   ├── layout.tsx                # Root layout with fonts and Toaster
+│   │   ├── page.tsx                  # Landing page (home)
+│   │   ├── globals.css               # Global styles and theme configuration
+│   │   ├── login/page.tsx            # Login and signup page
+│   │   ├── student/                  # Student-related pages
+│   │   │   ├── dashboard/page.tsx    # Student main dashboard
+│   │   │   └── mentors/              # Mentor discovery (placeholder)
+│   │   ├── teacher/                  # Teacher-related pages
+│   │   │   ├── dashboard/page.tsx    # Teacher main dashboard with Kanban
+│   │   │   ├── automation/page.tsx   # Automation tools page
+│   │   │   └── companion/            # AI companion (placeholder)
+│   │   ├── browse/[...site]/route.ts # Proxy route for iframe browsing
+│   │   ├── apply-automation/         # Application form automation
+│   │   ├── portal-demo/              # Portal demo pages
+│   │   └── api/
+│   │       ├── approve-student/route.ts  # Student approval API endpoint
+│   │       └── proxy/                    # Proxy API utilities
+│   │
+│   ├── components/
+│   │   ├── student/                  # Student-facing components
+│   │   │   ├── DashboardSidebar.tsx  # Student sidebar navigation
+│   │   │   ├── DocumentUpload.tsx    # File upload component
+│   │   │   ├── PortfolioBuilder.tsx  # Extracurricular activity manager
+│   │   │   ├── ReadinessMeter.tsx    # Application readiness indicator
+│   │   │   ├── ScoreInput.tsx        # Test scores input with OCR simulation
+│   │   │   └── tabs/                 # Dashboard tab components
+│   │   │       ├── IdentityTab.tsx   # Personal info (passport, DOB, address)
+│   │   │       ├── FamilyTab.tsx     # Family information
+│   │   │       ├── AcademicTab.tsx   # Academic documents (IELTS, GPA, etc.)
+│   │   │       └── EssaysTab.tsx     # Personal statement and essays
+│   │   │
+│   │   ├── teacher/                  # Teacher-facing components
+│   │   │   ├── TeacherSidebar.tsx    # Teacher sidebar navigation
+│   │   │   ├── KanbanBoard.tsx       # Drag-drop student pipeline
+│   │   │   ├── StudentListView.tsx   # Searchable student list
+│   │   │   ├── StudentDetailView.tsx # Individual student profile view
+│   │   │   ├── PendingStudentsView.tsx # Pending approval queue
+│   │   │   └── automation/           # Automation components
+│   │   │       ├── BrowserFrame.tsx  # Embedded browser iframe
+│   │   │       ├── DataSidecar.tsx   # Student data sidebar for copy/paste
+│   │   │       ├── DataInjectionOverlay.tsx # Data injection UI
+│   │   │       └── StudentQueue.tsx  # Student queue for automation
+│   │   │
+│   │   └── automation/               # Shared automation components
+│   │       ├── BrowserFrame.tsx      # Browser frame wrapper
+│   │       ├── DataInjectionOverlay.tsx # Data injection overlay
+│   │       └── SplitScreenLayout.tsx # Split screen layout for automation
+│   │
+│   ├── contexts/
+│   │   └── TeacherDataContext.tsx    # Shared state for teacher dashboard
+│   │
+│   └── utils/
+│       └── supabase/
+│           ├── client.ts             # Browser-side Supabase client
+│           └── server.ts             # Server-side Supabase client (cookies)
+│
+├── public/                           # Static assets
+│
+├── SQL Migration Files:
+│   ├── supabase_schema.sql           # Original schema definition
+│   ├── comprehensive_schema_fix.sql  # Complete schema with all fixes
+│   ├── master_fix.sql                # Master fix for login/profile issues
+│   ├── production_schema.sql         # Production-ready schema
+│   └── [multiple fix_*.sql files]    # Incremental fixes
+│
+├── package.json                      # Project dependencies
+├── tsconfig.json                     # TypeScript configuration
+├── next.config.ts                    # Next.js configuration
+├── postcss.config.mjs                # PostCSS for TailwindCSS
+├── eslint.config.mjs                 # ESLint configuration
+├── .env.local                        # Environment variables (Supabase keys)
+├── README.md                         # Default Next.js readme
+└── SETUP_GUIDE.md                    # Comprehensive setup instructions
+
+================================================================================
+DATABASE SCHEMA (Supabase PostgreSQL)
+================================================================================
+
+ENUMS:
+------
+- user_role: 'student' | 'teacher'
+- doc_type: 'IELTS' | 'TOEFL' | 'SAT' | 'GPA' | 'Passport' | 'Extracurricular'
+- doc_status: 'Pending' | 'Verified' | 'Rejected'
+- approval_status: 'pending' | 'approved' | 'rejected'
+
+TABLES:
+-------
+
+1. profiles (Primary user table)
+   - id: UUID (references auth.users)
+   - role: user_role (student/teacher)
+   - full_name: TEXT
+   - email: TEXT
+   - phone: TEXT
+   - teacher_id: UUID (for students, references their assigned teacher)
+   - approval_status: approval_status (pending/approved/rejected)
+   - passport_number: TEXT
+   - date_of_birth: DATE
+   - home_address: TEXT
+   - mother_full_name: TEXT
+   - father_full_name: TEXT
+   - bio: TEXT
+   - personal_statement: TEXT
+   - preferred_country: TEXT
+   - preferred_university: TEXT
+   - volunteering_hours: INTEGER
+   - created_at: TIMESTAMPTZ
+
+2. documents (Uploaded files metadata)
+   - id: UUID
+   - student_id: UUID (references profiles.id)
+   - type: doc_type
+   - file_url: TEXT
+   - score_data: JSONB (parsed scores from documents)
+   - status: doc_status (Pending/Verified/Rejected)
+   - created_at: TIMESTAMPTZ
+
+3. applications (University applications tracking)
+   - id: UUID
+   - student_id: UUID (references profiles.id)
+   - teacher_id: UUID (references profiles.id)
+   - university_name: TEXT
+   - status: TEXT (onboarding/docs_collected/applied/accepted)
+   - created_at: TIMESTAMPTZ
+
+4. essays (Student essays/personal statements)
+   - id: UUID
+   - student_id: UUID (references profiles.id)
+   - title: TEXT
+   - content: TEXT
+   - word_count: INTEGER
+   - status: TEXT (draft/submitted)
+   - created_at: TIMESTAMPTZ
+   - updated_at: TIMESTAMPTZ
+
+VIEWS:
+------
+- student_readiness: Shows if a student has all required documents
+
+STORAGE BUCKETS:
+----------------
+- documents: Stores uploaded files (PDFs, images)
+  - Organized by user ID: {user_id}/{docType}_{timestamp}.{ext}
+
+TRIGGERS:
+---------
+- on_auth_user_created: Automatically creates profile when user signs up
+  - Extracts role, full_name, teacher_id from user metadata
+  - Sets default approval_status to 'pending' for students
+
+ROW LEVEL SECURITY (RLS):
+-------------------------
+- profiles: Users see own profile, teachers see all profiles
+- documents: Students see own docs, teachers see all docs
+- applications: Students see own apps, teachers see assigned students
+- storage: Users access own folder, teachers access all
+
+================================================================================
+PAGE-BY-PAGE DESCRIPTION
+================================================================================
+
+1. LANDING PAGE (src/app/page.tsx)
+----------------------------------
+Route: /
+Purpose: Public marketing page for UNI Consulting
+Features:
+  - Fixed navbar with logo and Sign In/Get Started buttons
+  - Hero section with animated elements
+  - Animated "Application Accepted" floating card
+  - Role split section (For Students / For Teachers)
+  - Feature highlights for each role
+  - Footer with branding
+
+Components Used: Link, motion (Framer Motion)
+Authentication: Checks if user is logged in, redirects to appropriate dashboard
+
+2. LOGIN PAGE (src/app/login/page.tsx)
+--------------------------------------
+Route: /login
+Purpose: Unified login and signup page
+Features:
+  - Toggle between Login and Create Account
+  - Role selection (Student/Teacher) for signup
+  - Student signup shows teacher dropdown selection
+  - Email/password authentication via Supabase
+  - Stores metadata (role, full_name, teacher_id) on signup
+  - Auto-redirects based on role after login
+
+States:
+  - isLogin: boolean - toggles login/signup view
+  - selectedRole: 'student' | 'teacher' | null
+  - teachers: Teacher[] - list of available teachers for dropdown
+
+3. STUDENT DASHBOARD (src/app/student/dashboard/page.tsx)
+---------------------------------------------------------
+Route: /student/dashboard
+Purpose: Main hub for student activities
+Features:
+  - Sidebar navigation with tabs
+  - Profile tabs: Identity, Family, Academic, Essays
+  - Approval status banner (pending/approved/rejected)
+  - Locked state when pending approval (limited functionality)
+  - Portfolio builder for extracurriculars
+  - Readiness meter showing document completion
+
+Tabs:
+  1. Identity Tab - Personal info (passport, DOB, address, photo upload)
+  2. Family Tab - Parent information
+  3. Academic Tab - Document uploads (IELTS, TOEFL, GPA, Passport)
+  4. Essays Tab - Personal statement editor with word count
+
+State Management:
+  - Fetches profile data on mount
+  - Real-time subscription for profile updates
+  - Unlockable progress system for gamification
+
+4. TEACHER DASHBOARD (src/app/teacher/dashboard/page.tsx)
+---------------------------------------------------------
+Route: /teacher/dashboard
+Purpose: Command center for managing students
+Features:
+  - TeacherDataProvider context for shared state
+  - Statistics display (Total Students, Pending Review)
+  - Tab navigation: Dashboard, Pending, Students, Automation
+
+Views:
+  a) Dashboard View:
+     - Kanban board with drag-drop columns
+     - Columns: Onboarding → Docs Collected → Applied → Accepted
+     - Click student card to view details
+
+  b) Pending View:
+     - List of students awaiting approval
+     - Approve/Reject buttons
+
+  c) Students View:
+     - Searchable/filterable student list
+     - Click to view student details
+
+  d) Student Detail View:
+     - Full student profile and documents
+     - Request essay feature
+     - Download documents
+
+5. AUTOMATION PAGE (src/app/teacher/automation/page.tsx)
+--------------------------------------------------------
+Route: /teacher/automation
+Purpose: Semi-automated application form filling
+Features:
+  - Split screen layout (30% queue, 70% data sidecar)
+  - StudentQueue: List of students to process
+  - DataSidecar: Student data with copy buttons
+  - One-click copy for form field values
+  - Launch external portal button
+
+Components:
+  - StudentQueue.tsx: Scrollable student list with selection
+  - DataSidecar.tsx: Key-value data display with copy functionality
+  - BrowserFrame.tsx: Iframe for external portals (via proxy)
+
+6. BROWSE PROXY (src/app/browse/[...site]/route.ts)
+---------------------------------------------------
+Route: /browse/https/example.com/path
+Purpose: Proxy external websites for iframe embedding
+Features:
+  - Reconstructs target URL from path segments
+  - Fetches external content server-side
+  - Injects click interception script for link navigation
+  - Handles HTML, CSS, JS, images
+  - Removes X-Frame-Options and CSP for embedding
+  - Form submission warning (limited support)
+
+================================================================================
+COMPONENT DETAILS
+================================================================================
+
+STUDENT COMPONENTS:
+-------------------
+
+1. DashboardSidebar.tsx
+   - Navigation sidebar for student dashboard
+   - Avatar, title, tab buttons
+   - Logout functionality
+
+2. DocumentUpload.tsx
+   - File picker with drag-drop UI
+   - Upload to Supabase Storage
+   - Save metadata to documents table
+   - States: idle, uploading, success, error
+   - Visual feedback with icons
+
+3. PortfolioBuilder.tsx
+   - Extracurricular activity manager
+   - Add activities (Sports, Tech, Arts, Leadership)
+   - Modal form for new activities
+   - Activity cards with icons
+   - Locked state when unapproved
+
+4. ReadinessMeter.tsx
+   - Visual progress indicator
+   - Shows application readiness percentage
+   - Based on document completion
+
+5. ScoreInput.tsx
+   - Combined document upload + score entry
+   - "Magic scan" simulation (OCR placeholder)
+   - Manual score override
+   - Fields: varies by document type
+   - Save scores to documents.score_data
+
+6. tabs/IdentityTab.tsx
+   - Personal information form
+   - Fields: passport number, DOB, address, photo
+   - Passport document upload
+   - Save to profiles table
+
+7. tabs/FamilyTab.tsx
+   - Parent/guardian information
+   - Multiple parent entry forms
+   - Save to profiles table
+
+8. tabs/AcademicTab.tsx
+   - Academic document uploads
+   - IELTS, TOEFL, SAT, GPA sections
+   - Each with ScoreInput component
+
+9. tabs/EssaysTab.tsx
+   - Essay/personal statement editor
+   - Auto word count
+   - Save draft functionality
+   - Load existing essays
+
+TEACHER COMPONENTS:
+-------------------
+
+1. TeacherSidebar.tsx
+   - Navigation sidebar for teacher
+   - Tab buttons with icons
+   - Statistics preview
+   - Logout functionality
+
+2. KanbanBoard.tsx
+   - Drag-drop pipeline board
+   - Uses @dnd-kit for interactions
+   - Columns: Onboarding, Docs Collected, Applied, Accepted
+   - Student cards with name and readiness indicator
+   - Persists status to applications table
+
+3. StudentListView.tsx
+   - Searchable student table
+   - Filter by approval status
+   - Click row to view details
+   - Pagination support
+
+4. StudentDetailView.tsx
+   - Full student profile display
+   - Document list with download
+   - Request essay form
+   - Back navigation
+
+5. PendingStudentsView.tsx
+   - List of pending approval students
+   - Approve/Reject action buttons
+   - Calls /api/approve-student endpoint
+   - Real-time updates via context
+
+6. automation/StudentQueue.tsx
+   - Scrollable student list for automation
+   - Visual selection state
+   - Pulls from TeacherDataContext
+
+7. automation/DataSidecar.tsx
+   - Student data display panel
+   - Key-value pairs with copy buttons
+   - Copied state feedback
+   - Document list with file links
+
+8. automation/BrowserFrame.tsx
+   - Iframe wrapper for external sites
+   - Loading state
+   - URL display
+
+9. automation/DataInjectionOverlay.tsx
+   - Overlay for data injection UI
+   - Field highlighting
+   - Copy/paste helpers
+
+================================================================================
+CONTEXT API
+================================================================================
+
+TeacherDataContext.tsx
+----------------------
+Purpose: Centralized state for teacher dashboard
+Location: src/contexts/TeacherDataContext.tsx
+
+Provider: TeacherDataProvider
+Hook: useTeacherData()
+
+State:
+  - students: Student[] - all students assigned to teacher
+  - pendingStudents: Student[] - filtered pending approval
+  - stats: { total, pending, approved } - computed counts
+  - selectedStudentId: string | null - currently selected student
+  - isLoading: boolean - loading state
+
+Methods:
+  - setSelectedStudentId: (id: string | null) => void
+  - refreshData: () => Promise<void>
+
+Features:
+  - Real-time subscription to profile changes
+  - Automatic refresh on database updates
+  - Computed values for stats
+
+================================================================================
+API ROUTES
+================================================================================
+
+1. POST /api/approve-student
+----------------------------
+Purpose: Approve or reject student accounts
+Authentication: Requires teacher role
+Request Body:
+  {
+    studentId: string,
+    action: 'approve' | 'reject'
+  }
+Response:
+  { success: true, status: 'approved' | 'rejected' }
+
+Flow:
+  1. Verify teacher session
+  2. Confirm user is teacher role
+  3. Update student's approval_status
+  4. Return success/error
+
+================================================================================
+SUPABASE CLIENT UTILITIES
+================================================================================
+
+1. client.ts (Browser Client)
+-----------------------------
+Location: src/utils/supabase/client.ts
+Purpose: Supabase client for client-side components
+Usage: createClient() function
+Environment: Reads NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+Libraries: @supabase/ssr createBrowserClient
+
+2. server.ts (Server Client)
+----------------------------
+Location: src/utils/supabase/server.ts
+Purpose: Supabase client for server-side (API routes, server components)
+Usage: createClient() async function
+Features:
+  - Cookie-based session handling
+  - Server-side authentication
+Libraries: @supabase/ssr createServerClient
+
+================================================================================
+STYLING SYSTEM
+================================================================================
+
+globals.css Theme:
+------------------
+Custom Colors:
+  - --color-sunset-start: #E65100 (deep orange)
+  - --color-sunset-end: #FF9800 (orange)
+  - --color-electric-yellow: #FFEB3B
+  - --color-status-green: #10B981
+  - --color-status-red: #EF4444
+
+Fonts:
+  - --font-montserrat: Headings (800, 900 weights)
+  - --font-inter: Body text (400, 500, 600, 700 weights)
+
+Custom Utilities:
+  - .glass-panel: Glassmorphism effect
+  - .btn-primary: Yellow primary button with hover animation
+
+Body Style:
+  - Gradient background (orange to deep orange)
+
+================================================================================
+AUTHENTICATION FLOW
+================================================================================
+
+SIGNUP PROCESS:
+1. User fills form on /login (signup mode)
+2. Selects role (student/teacher)
+3. If student, selects teacher from dropdown
+4. Submits: supabase.auth.signUp() with metadata
+5. Trigger: on_auth_user_created fires
+6. Profile created in profiles table with metadata
+7. User redirected to appropriate dashboard
+
+LOGIN PROCESS:
+1. User enters email/password on /login
+2. Submits: supabase.auth.signInWithPassword()
+3. Session established
+4. Profile fetched to determine role
+5. Redirect: /teacher/dashboard or /student/dashboard
+
+APPROVAL FLOW (Students):
+1. New student signs up → approval_status = 'pending'
+2. Student sees limited functionality (locked state)
+3. Teacher sees student in Pending tab
+4. Teacher approves → API updates approval_status
+5. Student refreshes → full access unlocked
+6. Real-time subscription notifies student of status change
+
+================================================================================
+REAL-TIME FEATURES
+================================================================================
+
+1. Student Dashboard:
+   - Subscribes to own profile changes
+   - Updates UI when approval_status changes
+   - Uses postgres_changes event
+
+2. Teacher Dashboard:
+   - TeacherDataContext subscribes to student changes
+   - Filters by teacher_id
+   - Auto-refreshes on INSERT/UPDATE/DELETE
+
+3. Kanban Board:
+   - Status changes reflect immediately
+   - Drag-drop updates applications table
+   - Other tabs see updates via shared context
+
+================================================================================
+ENVIRONMENT VARIABLES
+================================================================================
+
+Required in .env.local:
+-----------------------
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+================================================================================
+KEY FEATURES SUMMARY
+================================================================================
+
+FOR STUDENTS:
+- Signup with teacher assignment
+- Approval workflow (pending → approved)
+- Profile management (4 tabs)
+- Document uploads (IELTS, TOEFL, GPA, Passport)
+- OCR simulation for score extraction
+- Essay writing and drafting
+- Extracurricular portfolio building
+- Application readiness tracking
+
+FOR TEACHERS:
+- Student approval queue
+- Kanban-style pipeline management
+- Student list with search/filter
+- Individual student profiles
+- Document viewing and download
+- Essay request system
+- Automation tools for form filling
+- Data sidecar with copy functionality
+- Real-time dashboard updates
+
+PLATFORM FEATURES:
+- Role-based access control
+- Row-level security on database
+- Real-time synchronization
+- Responsive design
+- Modern glassmorphism UI
+- Framer Motion animations
+- Toast notifications
+- Drag-and-drop interactions
+
+================================================================================
+DEVELOPMENT COMMANDS
+================================================================================
+
+npm run dev     # Start development server (localhost:3000)
+npm run build   # Build production bundle
+npm run start   # Start production server
+npm run lint    # Run ESLint
+
+================================================================================
+KNOWN CONSIDERATIONS
+================================================================================
+
+1. Must run database migration (comprehensive_schema_fix.sql) before use
+2. Students must select a teacher during signup
+3. Proxy route has limited form submission support
+4. Some components have placeholder/mock data
+5. OCR feature is simulated (not real AI)
+
+================================================================================
+QUESTIONS FOR AI AGENT - PROJECT IMPROVEMENT SUGGESTIONS
+================================================================================
+
+PROJECT SUMMARY FOR AI AGENT:
+-----------------------------
+This is UniConsulting - an EdTech CRM platform for university application 
+consulting. It connects students (applicants) with teacher/mentor consultants 
+who guide them through the study abroad application process.
+
+CURRENT FEATURES:
+- Student signup with teacher assignment + approval workflow
+- Document management (IELTS, TOEFL, SAT, GPA, Passport uploads)
+- Profile management (Identity, Family, Academic, Essays tabs)
+- Teacher Kanban board for pipeline management
+- Real-time chat between students and teachers
+- AI Essay Review (Gemini integration)
+- Semi-automated form filling tools for teachers
+- Real-time updates via Supabase Realtime
+
+TECH STACK: Next.js 16, React 19, Supabase, TailwindCSS 4, TypeScript
+
+================================================================================
+
+QUESTIONS TO ASK YOUR AI AGENT FOR IMPROVEMENTS:
+=================================================
+
+CATEGORY 1: AI/ML ENHANCEMENTS
+------------------------------
+1. What AI-powered features would you recommend adding to help students improve 
+   their university applications beyond essay review?
+
+2. How can we implement an intelligent university matching system that 
+   recommends universities based on student profiles, test scores, and 
+   preferences?
+
+3. What NLP capabilities should we add for automatic document parsing and 
+   data extraction from uploaded PDFs (transcripts, test score reports)?
+
+4. How can we create an AI-powered interview preparation coach that helps 
+   students practice for university admission interviews?
+
+5. What predictive analytics could we implement to estimate a student's 
+   admission chances at different universities?
+
+CATEGORY 2: STUDENT EXPERIENCE
+------------------------------
+6. What gamification elements would increase student engagement with the 
+   platform (badges, achievements, progress milestones)?
+
+7. How should we implement a deadline tracking and reminder system for 
+   university applications with smart notifications?
+
+8. What calendar integration features would help students manage their 
+   application timeline effectively?
+
+9. How can we add a peer community feature where students can connect 
+   with others applying to similar universities?
+
+10. What mobile app features would be most valuable for students on-the-go?
+
+CATEGORY 3: TEACHER/CONSULTANT TOOLS
+-------------------------------------
+11. What analytics dashboard would help teachers track student progress 
+    and identify at-risk applicants?
+
+12. How can we automate repetitive tasks in the teacher workflow 
+    (email templates, status updates, document requests)?
+
+13. What template library features would help teachers quickly customize 
+    common documents (recommendation letters, application checklists)?
+
+14. How should we implement a workload balancing system when teachers 
+    have too many assigned students?
+
+15. What reporting features would help teachers demonstrate their success 
+    rates to potential students?
+
+CATEGORY 4: DOCUMENT MANAGEMENT
+--------------------------------
+16. How can we implement version control for essays so students can 
+    see revision history and track improvements?
+
+17. What collaborative editing features would allow teachers to provide 
+    inline feedback on essays directly in the platform?
+
+18. How should we implement document OCR to automatically extract 
+    scores from IELTS/TOEFL/SAT score reports?
+
+19. What document verification system would help ensure uploaded 
+    documents are authentic and unmodified?
+
+20. How can we add digital signature capabilities for recommendation 
+    letters and official documents?
+
+CATEGORY 5: COMMUNICATION FEATURES
+-----------------------------------
+21. What video call integration would you recommend for virtual 
+    consultation sessions between students and teachers?
+
+22. How should we implement a notification center with customizable 
+    preferences for different event types?
+
+23. What chatbot capabilities would handle common student questions 
+    automatically without teacher involvement?
+
+24. How can we add multi-language support for international students 
+    whose first language is not English?
+
+25. What group messaging features would be useful for cohort-based 
+    announcements and updates?
+
+CATEGORY 6: ANALYTICS & INSIGHTS
+---------------------------------
+26. What dashboard visualizations would help students understand 
+    their application readiness compared to successful applicants?
+
+27. How can we implement comparative analytics showing success rates 
+    by university, major, and student background?
+
+28. What metrics should we track to measure platform effectiveness 
+    and student outcomes?
+
+29. How should we implement a university database with admission 
+    statistics, requirements, and deadlines?
+
+30. What benchmarking features would help students compare their 
+    profiles with admitted students at target universities?
+
+CATEGORY 7: PLATFORM SCALABILITY
+---------------------------------
+31. How should we architect the system to support multiple consulting 
+    agencies or educational institutions as tenants?
+
+32. What payment/subscription features would you recommend for 
+    monetizing the platform?
+
+33. How can we implement a referral system where successful students 
+    can refer new applicants?
+
+34. What API integrations with external services (Google Calendar, 
+    university portals, immigration systems) would add value?
+
+35. How should we design an offline mode for students with limited 
+    internet connectivity?
+
+CATEGORY 8: SECURITY & COMPLIANCE
+----------------------------------
+36. What additional security measures should we implement for 
+    handling sensitive student documents (passports, financial info)?
+
+37. How should we ensure GDPR/CCPA compliance for student data 
+    across different jurisdictions?
+
+38. What audit logging features would help track data access and 
+    modifications for compliance?
+
+39. How can we implement role-based permissions for different 
+    teacher/admin access levels?
+
+40. What backup and disaster recovery strategies would you recommend 
+    for a platform handling critical application documents?
+
+================================================================================
+HOW TO USE THESE QUESTIONS:
+================================================================================
+
+Copy and paste the relevant questions (along with the PROJECT SUMMARY above) 
+to your AI agent. The agent will have context about:
+
+1. What the platform does (university consulting CRM)
+2. Who the users are (students and teacher consultants)
+3. Current technology stack (Next.js, Supabase, React)
+4. Existing features (document management, chat, Kanban, AI essay review)
+
+This enables the AI agent to provide targeted, implementable suggestions 
+that fit within the existing architecture and user workflows.
+
+================================================================================
+END OF PROJECT DESCRIPTION
+================================================================================

@@ -1,0 +1,43 @@
+UNICONSULTING: EdTech CRM for university application consulting.
+Students upload docs (IELTS/TOEFL/GPA/Passport), write essays, chat with teachers.
+Teachers approve students, manage Kanban pipeline, review applications.
+Tech: Next.js 16, React 19, Supabase, TailwindCSS, TypeScript.
+
+Features: Student approval workflow, document management, profile tabs, 
+Kanban board, real-time chat, AI Essay Review (Gemini), form automation.
+
+IMPROVEMENT QUESTIONS:
+
+AI/ML:
+1. Implement intelligent university matching based on student profiles/scores?
+2. Add document OCR to auto-extract scores from PDF reports?
+3. Build AI interview preparation coach?
+4. Create admission chance predictor?
+
+STUDENT:
+5. Add gamification (badges, achievements)?
+6. Implement deadline tracking with smart reminders?
+7. Add peer community for students applying to similar schools?
+
+TEACHER:
+8. Build analytics dashboard to identify at-risk students?
+9. Automate repetitive tasks (email templates, status updates)?
+10. Create template library for recommendation letters?
+
+DOCUMENTS:
+11. Add version control for essays?
+12. Enable collaborative inline editing/feedback?
+
+COMMUNICATION:
+13. Integrate video calls for consultations?
+14. Add chatbot for common questions?
+
+ANALYTICS:
+15. Build university database with admission stats/deadlines?
+16. Add benchmarking vs admitted students?
+
+PLATFORM:
+17. Implement payment/subscription system?
+18. Add GDPR compliance and audit logging?
+
+How should we implement #[X]?
