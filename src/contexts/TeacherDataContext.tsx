@@ -12,6 +12,11 @@ interface Student {
     approval_status: 'pending' | 'approved' | 'rejected';
     preferred_country?: string;
     preferred_university?: string;
+    preferred_major?: string;
+    gpa?: number;
+    ielts_overall?: number;
+    sat_total?: number;
+    toefl_total?: number;
     created_at: string;
     teacher_id?: string;
 }
