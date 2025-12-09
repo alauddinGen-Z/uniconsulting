@@ -42,13 +42,18 @@ interface TeacherDataContextType {
     setSelectedStudentId: (id: string | null) => void;
     refreshData: () => Promise<void>;
     refreshStudents: () => Promise<void>;  // Alias for refreshData
+    smartRefresh: () => Promise<void>;     // Only refreshes if data is stale
     updateStudentStatus: (studentId: string, status: 'pending' | 'approved' | 'rejected') => Promise<void>;
     isLoading: boolean;        // True only on initial load
     isRefreshing: boolean;     // True during background refresh
     isDataReady: boolean;      // True once initial data is loaded
+    lastFetchedAt: number | null; // Timestamp of last successful fetch
 }
 
 const TeacherDataContext = createContext<TeacherDataContextType | undefined>(undefined);
+
+// Data freshness threshold: 5 minutes in milliseconds
+const DATA_FRESHNESS_THRESHOLD = 5 * 60 * 1000;
 
 export function TeacherDataProvider({ children }: { children: ReactNode }) {
     const [students, setStudents] = useState<Student[]>([]);
@@ -57,6 +62,7 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [teacherId, setTeacherId] = useState<string | null>(null);
+    const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
     const hasInitialized = useRef(false);
     const supabase = createClient();
 
@@ -95,6 +101,9 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
             if (studentsResult.data) {
                 setStudents(studentsResult.data);
             }
+
+            // Mark data as fresh
+            setLastFetchedAt(Date.now());
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
@@ -102,6 +111,17 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
             setIsRefreshing(false);
         }
     }, [supabase]);
+
+    // Smart refresh: only fetches if data is stale (older than threshold)
+    const smartRefresh = useCallback(async () => {
+        // Skip if data is still fresh
+        if (lastFetchedAt && (Date.now() - lastFetchedAt) < DATA_FRESHNESS_THRESHOLD) {
+            console.log('Data is fresh, skipping refetch');
+            return;
+        }
+        // Data is stale, do a background refresh
+        await fetchAllData(false);
+    }, [lastFetchedAt, fetchAllData]);
 
     // Optimistic update for student status - updates UI immediately, then syncs to DB
     const updateStudentStatus = useCallback(async (studentId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
@@ -199,10 +219,12 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
         setSelectedStudentId,
         refreshData: () => fetchAllData(false),
         refreshStudents: () => fetchAllData(false),  // Alias for refreshData
+        smartRefresh,
         updateStudentStatus,
         isLoading,
         isRefreshing,
-        isDataReady: !isLoading && students.length >= 0
+        isDataReady: !isLoading && students.length >= 0,
+        lastFetchedAt
     };
 
     return (
