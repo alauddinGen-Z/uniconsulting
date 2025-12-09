@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles } from "lucide-react";
+import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ interface TeacherSidebarProps {
 }
 
 export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSidebarProps) {
-    const [profile, setProfile] = useState<{ full_name: string; email: string } | null>(null);
+    const [profile, setProfile] = useState<{ full_name: string; email: string; is_admin: boolean } | null>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -30,13 +30,14 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
             if (user) {
                 const { data } = await supabase
                     .from('profiles')
-                    .select('full_name')
+                    .select('full_name, is_admin')
                     .eq('id', user.id)
                     .single();
 
                 setProfile({
                     full_name: data?.full_name || "Teacher",
-                    email: user.email || ""
+                    email: user.email || "",
+                    is_admin: data?.is_admin || false
                 });
             }
         };
@@ -59,6 +60,8 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
         { id: 'ai-matcher', label: 'AI Matcher', icon: Sparkles, hasAI: true },
         { id: 'messages', label: 'Messages', icon: MessageCircle },
         { id: 'automation', label: 'Automation', icon: Zap },
+        // Admin Panel - only shown for admin users
+        ...(profile?.is_admin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield, isAdmin: true }] : []),
     ];
 
     return (

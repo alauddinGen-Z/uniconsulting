@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, GraduationCap, Users, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowRight, GraduationCap, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import ParticlesBackground from "@/components/shared/ParticlesBackground";
 
-type Role = 'student' | 'teacher';
 
 interface Teacher {
     id: string;
@@ -19,7 +18,7 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [fullName, setFullName] = useState("");
-    const [role, setRole] = useState<Role>('student');
+    // Only student self-registration is allowed - teachers are added by admin
     const [selectedTeacher, setSelectedTeacher] = useState<string>("");
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +68,7 @@ export default function LoginPage() {
 
         try {
             if (isSignUp) {
-                if (role === 'student' && !selectedTeacher) {
+                if (!selectedTeacher) {
                     throw new Error("Please select a teacher to request access.");
                 }
                 if (!fullName.trim()) {
@@ -82,9 +81,9 @@ export default function LoginPage() {
                     options: {
                         data: {
                             full_name: fullName,
-                            role: role,
-                            teacher_id: role === 'student' ? selectedTeacher : null,
-                            approval_status: role === 'student' ? 'pending' : 'approved', // Teachers auto-approved for now
+                            role: 'student',
+                            teacher_id: selectedTeacher,
+                            approval_status: 'pending'
                         },
                     },
                 });
@@ -99,7 +98,7 @@ export default function LoginPage() {
                         .eq('id', data.user!.id)
                         .single();
 
-                    const userRole = profile?.role || role;
+                    const userRole = profile?.role || 'student';
                     toast.success(`Welcome, ${userRole}!`);
 
                     if (userRole === 'teacher') {
@@ -196,29 +195,13 @@ export default function LoginPage() {
                 <form onSubmit={handleAuth} className="space-y-4">
                     {isSignUp && (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setRole('student')}
-                                    className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${role === 'student'
-                                        ? 'border-orange-500 bg-orange-50 text-orange-600'
-                                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
-                                        }`}
-                                >
-                                    <GraduationCap className="w-6 h-6" />
-                                    <span className="text-xs font-bold uppercase">Student</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setRole('teacher')}
-                                    className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${role === 'teacher'
-                                        ? 'border-yellow-500 bg-yellow-50 text-yellow-600'
-                                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
-                                        }`}
-                                >
-                                    <Users className="w-6 h-6" />
-                                    <span className="text-xs font-bold uppercase">Teacher</span>
-                                </button>
+                            {/* Students only - Teachers are added by admin */}
+                            <div className="p-4 rounded-xl border-2 border-orange-500 bg-orange-50 text-orange-600 flex items-center gap-3">
+                                <GraduationCap className="w-6 h-6" />
+                                <div>
+                                    <span className="text-xs font-bold uppercase block">Student Registration</span>
+                                    <span className="text-[10px] text-orange-500">Teachers are added by administrators</span>
+                                </div>
                             </div>
 
                             <div className="space-y-1">
@@ -233,23 +216,21 @@ export default function LoginPage() {
                                 />
                             </div>
 
-                            {role === 'student' && (
-                                <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Select Your Teacher</label>
-                                    <select
-                                        value={selectedTeacher}
-                                        onChange={(e) => setSelectedTeacher(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all bg-white"
-                                        required
-                                    >
-                                        <option value="">-- Choose a Mentor --</option>
-                                        {teachers.map(t => (
-                                            <option key={t.id} value={t.id}>{t.full_name || "Unnamed Teacher"}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-[10px] text-slate-400">* You must be approved by a teacher to access the platform.</p>
-                                </div>
-                            )}
+                            <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Select Your Teacher</label>
+                                <select
+                                    value={selectedTeacher}
+                                    onChange={(e) => setSelectedTeacher(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all bg-white"
+                                    required
+                                >
+                                    <option value="">-- Choose a Mentor --</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.full_name || "Unnamed Teacher"}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-400">* You must be approved by a teacher to access the platform.</p>
+                            </div>
                         </div>
                     )}
 

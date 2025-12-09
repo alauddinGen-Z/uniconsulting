@@ -1,0 +1,557 @@
+================================================================================
+                        UNICONSULTING - FULL TECHNICAL DOCUMENTATION
+================================================================================
+
+Generated: 2025-12-08
+Version: 0.1.0
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+PROJECT NAME: UniConsulting
+
+HIGH-LEVEL SUMMARY:
+UniConsulting is a university consulting web application that connects students 
+with teacher consultants for university application guidance. The platform serves 
+as an intelligent bridge between student ambitions and university admissions 
+success, providing a comprehensive ecosystem for managing the entire application 
+process.
+
+PROBLEM IT SOLVES:
+- Streamlines the university application process for international students
+- Provides centralized management for consultants handling multiple students
+- Offers AI-powered tools for essay review and university matching
+- Enables real-time communication between students and teachers
+- Automates document extraction and academic score tracking
+- Implements a gamification system to encourage student engagement
+
+CORE USER ROLES:
+1. STUDENT: 
+   - Fills academic profile (identity, family, scores)
+   - Uploads required documents (passport, transcripts, certificates)
+   - Writes and revises essays with AI coaching feedback
+   - Maintains a list of target universities
+   - Communicates with assigned teacher via real-time chat
+
+2. TEACHER (Consultant):
+   - Approves/rejects student registrations
+   - Views comprehensive student profiles and documents
+   - Manages students via Kanban board for tracking pipeline status
+   - Uses AI-powered university matcher to recommend schools
+   - Communicates with students via direct and group chats
+   - Accesses automation tools for bulk operations
+
+
+================================================================================
+2. TECHNICAL STACK
+================================================================================
+
+------------------------------------------------------------------------------
+PROGRAMMING LANGUAGES
+------------------------------------------------------------------------------
+- TypeScript (primary language for all source code)
+- JavaScript (build configuration)
+- SQL (database migrations and schemas)
+- CSS (styling)
+
+------------------------------------------------------------------------------
+FRAMEWORKS & MAJOR LIBRARIES
+------------------------------------------------------------------------------
+
+FRONTEND:
+- Next.js 16.0.7 (App Router architecture)
+- React 19.2.1 (UI library)
+- Tailwind CSS 4 (utility-first CSS framework)
+- Framer Motion 12.23.24 (animations and transitions)
+- Lucide React 0.555.0 (icon library)
+- @dnd-kit/core 6.3.1 & @dnd-kit/sortable 10.0.0 (drag-and-drop for Kanban)
+- Sonner 2.0.7 (toast notifications)
+- Canvas Confetti 1.9.4 (celebration effects for gamification)
+
+BACKEND:
+- Next.js API Routes (server-side endpoints)
+- Supabase Edge Functions (Deno-based serverless functions)
+- @supabase/ssr 0.8.0 (server-side Supabase client)
+- @supabase/supabase-js 2.86.0 (Supabase client SDK)
+
+AI & MACHINE LEARNING:
+- @google/generative-ai 0.24.1 (Google Gemini API for AI features)
+- Google Vision API (Document OCR via Gemini multimodal)
+
+DEV DEPENDENCIES:
+- TypeScript 5
+- ESLint 9 with eslint-config-next
+- @netlify/plugin-nextjs 5.15.1 (Netlify deployment)
+- @tailwindcss/postcss 4 (PostCSS integration)
+
+------------------------------------------------------------------------------
+DATABASE
+------------------------------------------------------------------------------
+- Supabase (PostgreSQL-based)
+- Project URL: https://ylwyuogdfwugjexyhtrq.supabase.co
+- Row Level Security (RLS) enabled on all tables
+- Realtime subscriptions enabled for profiles, messages, conversations
+
+CORE TABLES:
+- profiles: User profiles for students and teachers
+- documents: Uploaded student documents
+- essays: Student essays with AI feedback
+- essay_versions: Version history for time-travel feature
+- universities / student_universities: Target university lists
+- academic_scores: IELTS, SAT, GPA scores
+- conversations: Chat conversations (direct/group)
+- conversation_participants: Users in each conversation
+- messages: Chat messages
+
+------------------------------------------------------------------------------
+AUTHENTICATION
+------------------------------------------------------------------------------
+- Supabase Auth (email/password authentication)
+- Session-based authentication with SSR support
+- Role-based access control (student/teacher)
+- Approval workflow (pending/approved/rejected status)
+
+
+================================================================================
+3. COMPREHENSIVE FEATURE LIST
+================================================================================
+
+------------------------------------------------------------------------------
+STUDENT FEATURES
+------------------------------------------------------------------------------
+
+1. STUDENT DASHBOARD HOME
+   Function: Displays personalized welcome, approval status banner (dismissible),
+   progress statistics, recent activities, and quick navigation cards.
+   Tech: src/components/student/HomeDashboard.tsx
+
+2. IDENTITY PROFILE TAB
+   Function: Collects and saves personal information (name, email, phone, 
+   passport number, date of birth, city of birth, home address).
+   Tech: src/components/student/tabs/IdentityTab.tsx
+
+3. FAMILY INFORMATION TAB
+   Function: Records family details (father/mother names and occupations).
+   Tech: src/components/student/tabs/FamilyTab.tsx
+
+4. ACADEMIC SCORES TAB
+   Function: Stores standardized test scores (IELTS sectional scores, SAT 
+   total/math/reading, TOEFL, GPA per year, preferred major).
+   Tech: src/components/student/tabs/AcademicTab.tsx
+
+5. ESSAY WRITING & VERSION HISTORY
+   Function: Rich text editor for essays with word count, character count, 
+   UCAS/Common App limit tracking, auto-save, version history ("Time Travel" 
+   feature), and content restoration from previous versions.
+   Tech: src/components/student/tabs/EssaysTab.tsx, EssayVersionHistory.tsx
+
+6. AI ESSAY COACHING FEEDBACK
+   Function: Submits essay to Google Gemini AI for comprehensive feedback 
+   including overall score (1-10), strengths, improvements, structure analysis,
+   grammar issues, "Show Don't Tell" detection, "Pickup Test" flags, and 
+   coaching prompts. Displays results in expandable sections.
+   Tech: Supabase Edge Function (supabase/functions/ai-review/index.ts)
+
+7. DOCUMENT MANAGEMENT & UPLOAD
+   Function: Organizes documents by category (passport, diploma, transcript,
+   certificates, photos, etc.) with drag-and-drop upload, file preview,
+   and deletion capability.
+   Tech: src/components/student/DocumentsPage.tsx, DocumentUpload.tsx
+
+8. DOCUMENT OCR SCANNING
+   Function: Extracts text and scores from uploaded documents using Google 
+   Gemini Vision API, auto-populates academic fields based on document type.
+   Tech: src/app/api/document-ocr/route.ts, Supabase Edge Function
+
+9. UNIVERSITY LIST MANAGEMENT
+   Function: Maintains list of target universities with country, program,
+   deadline tracking, application status (researching/applying/applied/
+   accepted/rejected), and personal notes.
+   Tech: src/components/student/UniversityList.tsx
+
+10. REAL-TIME CHAT WITH TEACHER
+    Function: Direct messaging with assigned teacher, message history, 
+    real-time updates via Supabase Realtime, unread message count badge.
+    Tech: src/components/chat/ChatView.tsx, useUnreadMessageCount.ts hook
+
+11. GAMIFICATION & XP SYSTEM
+    Function: Awards experience points for actions (saving essays, uploading 
+    documents, completing profile, getting AI feedback), level progression 
+    with named ranks (Newcomer to Legend).
+    Tech: src/lib/constants.ts (XP_REWARDS, LEVEL_THRESHOLDS, LEVEL_NAMES)
+
+------------------------------------------------------------------------------
+TEACHER FEATURES
+------------------------------------------------------------------------------
+
+12. TEACHER COMMAND CENTER (HOME DASHBOARD)
+    Function: Displays statistics (total students, pending approvals, 
+    approved students, document count, upcoming deadlines), recent activity 
+    feed, deadline tracking, and quick access cards.
+    Tech: src/components/teacher/TeacherHomeDashboard.tsx
+
+13. STUDENT APPROVAL WORKFLOW
+    Function: Lists pending student registrations, allows teachers to approve 
+    or reject accounts. Upon approval, auto-creates a direct chat conversation 
+    with a welcome message.
+    Tech: src/app/api/approve-student/route.ts, PendingStudentsView.tsx
+
+14. STUDENT LIST VIEW WITH SEARCH & FILTER
+    Function: Searchable and filterable list of all assigned students, 
+    displays key info (name, email, approval status, preferred university),
+    clickable rows to view detailed student profile.
+    Tech: src/components/teacher/StudentListView.tsx
+
+15. STUDENT DETAIL VIEW (COMPANION WINDOW)
+    Function: Comprehensive read-only view of individual student's complete 
+    profile, academic scores, documents, essays, and university list.
+    Tech: src/components/teacher/StudentDetailView.tsx, CompanionWindow.tsx
+
+16. KANBAN BOARD (PIPELINE MANAGEMENT)
+    Function: Drag-and-drop board with columns (New, Preparing, Applied, 
+    Accepted) for tracking student progress through application pipeline.
+    Updates pipeline_status in database.
+    Tech: src/components/teacher/KanbanBoard.tsx (uses @dnd-kit)
+
+17. AI UNIVERSITY MATCHER
+    Function: Analyzes student's complete profile (GPA, test scores, 
+    preferences) using Google Gemini to recommend top 5 matching universities
+    with match scores, reasons, requirements, and tuition ranges. Teachers 
+    can add recommendations directly to student's university list.
+    Tech: src/components/teacher/AIMatcherView.tsx, /api/university-matcher
+
+18. GROUP CHAT & ANNOUNCEMENTS
+    Function: Create group chats with multiple students, send announcements,
+    manage conversation participants.
+    Tech: src/components/chat/ChatView.tsx, WhatsAppChat.tsx
+
+19. AUTOMATION VIEW
+    Function: Bulk automation tools for managing students, with companion 
+    window for quick data access and student queue management.
+    Tech: src/components/teacher/AutomationView.tsx, automation/
+
+20. REAL-TIME DATA SYNC
+    Function: TeacherDataContext provides shared state across all teacher 
+    views with Supabase Realtime subscriptions for live updates when students
+    register, documents are uploaded, or status changes.
+    Tech: src/contexts/TeacherDataContext.tsx
+
+------------------------------------------------------------------------------
+SHARED FEATURES
+------------------------------------------------------------------------------
+
+21. AUTHENTICATION & LOGIN
+    Function: Email/password login with role-based routing (students→student 
+    dashboard, teachers→teacher dashboard), new user registration.
+    Tech: src/app/login/page.tsx
+
+22. PROFILE MODAL
+    Function: View and edit personal profile information from any page.
+    Tech: src/components/shared/ProfileModal.tsx
+
+23. SETTINGS MODAL
+    Function: Application settings and preferences management.
+    Tech: src/components/shared/SettingsModal.tsx
+
+24. UNREAD MESSAGE COUNT BADGE
+    Function: Real-time badge showing count of unread messages across all 
+    conversations, updates live with new messages.
+    Tech: src/hooks/useUnreadMessageCount.ts
+
+25. FLOATING PENDING BADGE (TEACHERS)
+    Function: Persistent notification for teachers showing pending student 
+    approval count.
+    Tech: src/components/teacher/FloatingPendingBadge.tsx
+
+26. PARTICLES BACKGROUND
+    Function: Interactive particle animation for visual enhancement on 
+    landing page.
+    Tech: src/components/shared/ParticlesBackground.tsx
+
+------------------------------------------------------------------------------
+API ENDPOINTS
+------------------------------------------------------------------------------
+
+POST /api/approve-student
+  - Approves or rejects student registration
+  - Auto-creates chat conversation on approval
+  - Requires teacher authentication
+
+POST /api/document-ocr
+  - Accepts document image (base64)
+  - Returns extracted text and structured scores
+  - Detects document type for field mapping
+
+POST /api/university-matcher
+  - Accepts studentId
+  - Returns AI-generated university recommendations
+  - Requires teacher authentication
+
+POST /api/ai-review (local proxy)
+  - Proxies requests to Supabase Edge Function
+
+POST /api/proxy
+  - General proxy for external API calls
+
+------------------------------------------------------------------------------
+SUPABASE EDGE FUNCTIONS
+------------------------------------------------------------------------------
+
+ai-review
+  - Essay coaching feedback using Gemini AI
+  - Endpoint: https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/ai-review
+
+document-ocr
+  - Document text/score extraction
+  - Endpoint: https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/document-ocr
+
+university-matcher
+  - AI university matching (alternate deployment)
+  - Endpoint: https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/university-matcher
+
+
+================================================================================
+4. PROJECT STRUCTURE
+================================================================================
+
+uniconsulting/
+├── .env.local                    # Environment variables (Supabase keys, Gemini API)
+├── .gitignore                    # Git ignore patterns
+├── .nvmrc                        # Node version specification (v20)
+├── AI_AGENT_PROMPT.txt           # AI agent instructions
+├── PROJECT_ARCHITECTURE.md       # Architecture documentation
+├── PROJECT_DESCRIPTION.txt       # Previous project description
+├── README.md                     # Project readme
+├── SETUP_GUIDE.md                # Setup instructions
+├── eslint.config.mjs             # ESLint configuration
+├── netlify.toml                  # Netlify deployment configuration
+├── next.config.ts                # Next.js configuration
+├── package.json                  # NPM dependencies and scripts
+├── package-lock.json             # Dependency lock file
+├── postcss.config.mjs            # PostCSS configuration
+├── tsconfig.json                 # TypeScript configuration
+│
+├── public/                       # Static assets (5 files)
+│   └── [favicons, images, etc.]
+│
+├── sql/                          # Database migration scripts (36 files)
+│   ├── database.sql              # Main schema
+│   ├── add_*.sql                 # Feature additions (chat, essays, etc.)
+│   └── fix_*.sql                 # Bug fixes and patches
+│
+├── supabase/                     # Supabase configurations
+│   ├── functions/                # Edge Functions
+│   │   ├── ai-review/            # AI essay review function
+│   │   ├── document-ocr/         # Document OCR function
+│   │   └── university-matcher/   # University matcher function
+│   └── migrations/               # Supabase migrations
+│
+└── src/                          # Source code
+    ├── app/                      # Next.js App Router pages
+    │   ├── api/                  # API routes
+    │   │   ├── ai-review/        # AI review proxy
+    │   │   ├── approve-student/  # Student approval endpoint
+    │   │   ├── document-ocr/     # OCR endpoint
+    │   │   ├── proxy/            # General proxy
+    │   │   └── university-matcher/ # Uni matcher endpoint
+    │   ├── login/                # Login page
+    │   │   └── page.tsx
+    │   ├── student/              # Student pages
+    │   │   └── dashboard/        # Student dashboard
+    │   │       └── page.tsx
+    │   ├── teacher/              # Teacher pages
+    │   │   ├── dashboard/        # Teacher dashboard
+    │   │   │   └── page.tsx
+    │   │   └── companion/        # Student detail view
+    │   │       └── page.tsx
+    │   ├── globals.css           # Global styles
+    │   ├── layout.tsx            # Root layout
+    │   ├── page.tsx              # Landing page
+    │   └── favicon.ico
+    │
+    ├── components/               # React components
+    │   ├── chat/                 # Chat system (3 files)
+    │   │   ├── ChatView.tsx      # Main chat component
+    │   │   ├── StudentChat.tsx   # Student-specific chat
+    │   │   └── WhatsAppChat.tsx  # WhatsApp-style chat UI
+    │   │
+    │   ├── shared/               # Shared components (4 files)
+    │   │   ├── LoadingSpinner.tsx
+    │   │   ├── ParticlesBackground.tsx
+    │   │   ├── ProfileModal.tsx
+    │   │   └── SettingsModal.tsx
+    │   │
+    │   ├── student/              # Student components (10 files)
+    │   │   ├── tabs/             # Tab content (4 files)
+    │   │   │   ├── AcademicTab.tsx
+    │   │   │   ├── EssaysTab.tsx
+    │   │   │   ├── FamilyTab.tsx
+    │   │   │   └── IdentityTab.tsx
+    │   │   ├── ApplicationPage.tsx
+    │   │   ├── DashboardSidebar.tsx
+    │   │   ├── DocumentsPage.tsx
+    │   │   ├── DocumentsTabPage.tsx
+    │   │   ├── DocumentUpload.tsx
+    │   │   ├── EssayVersionHistory.tsx
+    │   │   ├── HomeDashboard.tsx
+    │   │   ├── ProfilePage.tsx
+    │   │   └── UniversityList.tsx
+    │   │
+    │   └── teacher/              # Teacher components (13 files)
+    │       ├── automation/       # Automation tools (4 files)
+    │       │   ├── CompanionWindow.tsx
+    │       │   ├── CompanionWindowDynamic.tsx
+    │       │   ├── DataSidecar.tsx
+    │       │   └── StudentQueue.tsx
+    │       ├── AIMatcherView.tsx
+    │       ├── AutomationView.tsx
+    │       ├── FloatingPendingBadge.tsx
+    │       ├── KanbanBoard.tsx
+    │       ├── PendingStudentsView.tsx
+    │       ├── StudentDetailView.tsx
+    │       ├── StudentListView.tsx
+    │       ├── TeacherHomeDashboard.tsx
+    │       └── TeacherSidebar.tsx
+    │
+    ├── contexts/                 # React contexts (1 file)
+    │   └── TeacherDataContext.tsx  # Shared teacher data & realtime sync
+    │
+    ├── hooks/                    # Custom React hooks (1 file)
+    │   └── useUnreadMessageCount.ts
+    │
+    ├── lib/                      # Utilities & configuration (3 files)
+    │   ├── config.ts             # API endpoints, feature flags
+    │   ├── constants.ts          # App constants, colors, XP system
+    │   └── index.ts              # Re-exports
+    │
+    ├── types/                    # TypeScript types (3 files)
+    │   ├── database.types.ts     # Supabase table types
+    │   └── index.ts              # Re-exports
+    │
+    └── utils/                    # Utility functions
+        └── supabase/             # Supabase clients (3 files)
+            ├── client.ts         # Browser client
+            ├── middleware.ts     # Auth middleware
+            └── server.ts         # Server client
+
+
+================================================================================
+5. INSTALLATION & SETUP
+================================================================================
+
+------------------------------------------------------------------------------
+PREREQUISITES
+------------------------------------------------------------------------------
+- Node.js v20 or higher (specified in .nvmrc)
+- npm (comes with Node.js)
+- A Supabase project (free tier available)
+- Google Cloud account with Gemini API enabled
+
+------------------------------------------------------------------------------
+STEP 1: CLONE THE REPOSITORY
+------------------------------------------------------------------------------
+git clone <repository-url>
+cd uniconsulting
+
+------------------------------------------------------------------------------
+STEP 2: INSTALL DEPENDENCIES
+------------------------------------------------------------------------------
+npm install
+
+------------------------------------------------------------------------------
+STEP 3: CONFIGURE ENVIRONMENT VARIABLES
+------------------------------------------------------------------------------
+Create a .env.local file in the root directory with:
+
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+GEMINI_API_KEY=your_google_gemini_api_key
+
+------------------------------------------------------------------------------
+STEP 4: SET UP SUPABASE DATABASE
+------------------------------------------------------------------------------
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Run the following SQL files in order:
+   - sql/database.sql (main schema)
+   - sql/add_chat_tables.sql (chat system)
+   - sql/add_essays_table.sql (essays feature)
+   - sql/add_essay_versions.sql (version history)
+   - sql/add_gamification.sql (XP system)
+   - Run any additional fix_*.sql as needed
+
+------------------------------------------------------------------------------
+STEP 5: DEPLOY SUPABASE EDGE FUNCTIONS (Optional)
+------------------------------------------------------------------------------
+If you need AI features via Edge Functions:
+
+# Install Supabase CLI
+npm install -g supabase
+
+# Login to Supabase
+supabase login
+
+# Link your project
+supabase link --project-ref ylwyuogdfwugjexyhtrq
+
+# Deploy functions
+supabase functions deploy ai-review
+supabase functions deploy document-ocr
+supabase functions deploy university-matcher
+
+# Set function secrets
+supabase secrets set GEMINI_API_KEY=your_key
+
+------------------------------------------------------------------------------
+STEP 6: RUN THE DEVELOPMENT SERVER
+------------------------------------------------------------------------------
+npm run dev
+
+Open http://localhost:3000 in your browser.
+
+------------------------------------------------------------------------------
+STEP 7: BUILD FOR PRODUCTION
+------------------------------------------------------------------------------
+npm run build
+npm run start
+
+------------------------------------------------------------------------------
+STEP 8: DEPLOY TO NETLIFY (Optional)
+------------------------------------------------------------------------------
+The project includes netlify.toml configuration.
+
+1. Connect your GitHub repository to Netlify
+2. Set environment variables in Netlify dashboard:
+   - NEXT_PUBLIC_SUPABASE_URL
+   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+   - GEMINI_API_KEY
+3. Deploy will trigger automatically
+
+------------------------------------------------------------------------------
+AVAILABLE NPM SCRIPTS
+------------------------------------------------------------------------------
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+
+------------------------------------------------------------------------------
+IMPORTANT NOTES
+------------------------------------------------------------------------------
+1. VPN/Network Considerations: If operating from China, external API calls 
+   should go through Supabase Edge Functions to bypass network restrictions.
+
+2. First Teacher Account: Manually set role='teacher' in the profiles table 
+   for the first teacher account after registration.
+
+3. Default Approval: New student registrations default to 'pending' status 
+   and require teacher approval.
+
+4. Realtime: Ensure Supabase Realtime is enabled for the profiles, messages, 
+   and conversations tables.
+
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================

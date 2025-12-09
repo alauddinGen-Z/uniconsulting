@@ -10,6 +10,7 @@ import AIMatcherView from "@/components/teacher/AIMatcherView";
 import FloatingPendingBadge from "@/components/teacher/FloatingPendingBadge";
 import WhatsAppChat from "@/components/chat/WhatsAppChat";
 import TeacherHomeDashboard from "@/components/teacher/TeacherHomeDashboard";
+import AdminPanel from "@/components/teacher/AdminPanel";
 import { TeacherDataProvider, useTeacherData } from "@/contexts/TeacherDataContext";
 
 function DashboardContent() {
@@ -60,6 +61,10 @@ function DashboardContent() {
                             <AutomationView />
                         </div>
                     </>
+                ) : activeTab === 'admin' ? (
+                    <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <AdminPanel />
+                    </div>
                 ) : (
                     // Dashboard Tab - Rich Teacher Dashboard
                     <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
