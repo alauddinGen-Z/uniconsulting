@@ -160,6 +160,7 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
 
         const channel = supabase
             .channel('teacher-realtime-sync')
+            // Listen for new students assigned to this teacher
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -167,10 +168,10 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
                 filter: `teacher_id=eq.${teacherId}`
             }, (payload) => {
                 console.log('New student added:', payload);
-                // Add new student to list
                 setStudents(prev => [payload.new as Student, ...prev]);
                 toast.success('New student registered!');
             })
+            // Listen for updates to students already in our list
             .on('postgres_changes', {
                 event: 'UPDATE',
                 schema: 'public',
@@ -178,11 +179,31 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
                 filter: `teacher_id=eq.${teacherId}`
             }, (payload) => {
                 console.log('Student updated:', payload);
-                // Update student in list (if not from our own optimistic update)
-                setStudents(prev => prev.map(s =>
-                    s.id === payload.new.id ? { ...s, ...payload.new } as Student : s
-                ));
+                const newData = payload.new as Student;
+                const oldData = payload.old as Student;
+
+                // Check if student was TRANSFERRED TO this teacher (teacher_id changed)
+                if (oldData.teacher_id !== teacherId && newData.teacher_id === teacherId) {
+                    // New student transferred to us - add to list
+                    setStudents(prev => {
+                        // Check if already in list
+                        if (prev.some(s => s.id === newData.id)) {
+                            return prev.map(s => s.id === newData.id ? newData : s);
+                        }
+                        return [newData, ...prev];
+                    });
+                    toast.success('New student transferred to you!');
+                } else if (newData.teacher_id !== teacherId) {
+                    // Student was transferred AWAY from us - remove from list
+                    setStudents(prev => prev.filter(s => s.id !== newData.id));
+                } else {
+                    // Normal update - student still belongs to us
+                    setStudents(prev => prev.map(s =>
+                        s.id === newData.id ? { ...s, ...newData } : s
+                    ));
+                }
             })
+            // Listen for deletions
             .on('postgres_changes', {
                 event: 'DELETE',
                 schema: 'public',
@@ -196,8 +217,41 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
                 console.log('Realtime subscription status:', status);
             });
 
+        // Second channel: Listen for ALL student profile updates to catch teacher changes
+        // This catches students switching TO this teacher (which the filtered subscription misses)
+        const transferChannel = supabase
+            .channel('teacher-transfer-sync')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'profiles',
+                filter: `role=eq.student`
+            }, (payload) => {
+                const newData = payload.new as Student;
+                const oldData = payload.old as Partial<Student>;
+
+                // Check if student was transferred TO this teacher
+                if (oldData.teacher_id !== teacherId && newData.teacher_id === teacherId) {
+                    console.log('Student transferred to this teacher:', newData);
+                    setStudents(prev => {
+                        if (prev.some(s => s.id === newData.id)) {
+                            return prev.map(s => s.id === newData.id ? newData : s);
+                        }
+                        return [newData, ...prev];
+                    });
+                    toast.success(`${newData.full_name || 'A student'} transferred to you!`);
+                }
+                // Check if student was transferred AWAY from this teacher
+                else if (oldData.teacher_id === teacherId && newData.teacher_id !== teacherId) {
+                    console.log('Student transferred away from this teacher:', newData);
+                    setStudents(prev => prev.filter(s => s.id !== newData.id));
+                }
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(channel);
+            supabase.removeChannel(transferChannel);
         };
     }, [teacherId, supabase]);
 
