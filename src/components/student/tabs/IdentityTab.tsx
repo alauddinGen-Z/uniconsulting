@@ -60,6 +60,17 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
             fetchProfile();
             fetchTeachers();
         }
+
+        // Listen for profile-updated event from DocumentsPage OCR
+        const handleProfileUpdated = () => {
+            console.log("Profile updated event received, reloading IdentityTab...");
+            fetchProfile();
+        };
+        window.addEventListener('profile-updated', handleProfileUpdated);
+
+        return () => {
+            window.removeEventListener('profile-updated', handleProfileUpdated);
+        };
     }, []);
 
     const fetchTeachers = async () => {

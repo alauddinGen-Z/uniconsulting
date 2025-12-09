@@ -12,7 +12,7 @@ const corsHeaders = {
 interface OCRRequest {
     imageBase64?: string;
     imageUrl?: string;
-    documentType?: 'ielts' | 'gpa' | 'sat' | 'toefl' | 'other';
+    documentType?: 'ielts' | 'gpa' | 'sat' | 'toefl' | 'passport' | 'portrait' | 'other';
     mimeType?: string;
 }
 
@@ -37,6 +37,16 @@ interface ExtractedScores {
     sat_reading?: string;
     // TOEFL scores
     toefl_total?: string;
+    // Passport info
+    full_name?: string;
+    passport_number?: string;
+    nationality?: string;
+    date_of_birth?: string;
+    passport_expiry?: string;
+    gender?: string;
+    city_of_birth?: string;
+    // School system
+    school_system?: string;
 }
 
 interface OCRResponse {
@@ -268,6 +278,36 @@ Return ONLY a JSON object in this exact format (no other text):
 }
 
 Replace with actual value. If not visible, use null.`;
+    } else if (documentType === "passport") {
+        prompt = `Analyze this passport document carefully. Extract the personal information.
+
+Return ONLY a JSON object in this exact format (no other text):
+{
+    "full_name": "JOHN DOE",
+    "passport_number": "AB1234567",
+    "nationality": "UNITED STATES",
+    "date_of_birth": "1990-05-15",
+    "passport_expiry": "2030-05-14",
+    "gender": "male",
+    "city_of_birth": "NEW YORK"
+}
+
+CRITICAL RULES:
+- Extract EXACTLY what you see in the document
+- For dates, use YYYY-MM-DD format
+- For gender, use "male" or "female" (lowercase)
+- For nationality, use the country name as shown
+- If a field is not visible, use null`;
+    } else if (documentType === "portrait") {
+        prompt = `This is a portrait photo. Just confirm it shows a person's face.
+
+Return ONLY a JSON object:
+{
+    "is_valid_portrait": true,
+    "notes": "Clear portrait photo suitable for applications"
+}
+
+Return is_valid_portrait as false if the image is not a proper portrait photo.`;
     } else {
         prompt = `Extract ALL text from this document. If it's an academic transcript, identify:
 1. All subject names and their corresponding grades/scores

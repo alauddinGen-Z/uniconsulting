@@ -125,12 +125,12 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
             setShowCustomUpload(false);
             setCustomDocName("");
 
-            // Auto-extract scores for academic documents using AI
-            const academicDocTypes = ['gpa', 'ielts', 'sat', 'toefl'];
-            console.log("Checking if should extract scores for:", categoryId, "includes:", academicDocTypes.includes(categoryId.toLowerCase()));
+            // Auto-extract info for academic documents AND passport using AI
+            const extractableDocTypes = ['gpa', 'ielts', 'sat', 'toefl', 'passport'];
+            console.log("Checking if should extract for:", categoryId, "includes:", extractableDocTypes.includes(categoryId.toLowerCase()));
 
-            if (academicDocTypes.includes(categoryId.toLowerCase())) {
-                toast.loading("✨ AI is extracting scores...", { id: "ai-extract" });
+            if (extractableDocTypes.includes(categoryId.toLowerCase())) {
+                toast.loading("✨ AI is extracting information...", { id: "ai-extract" });
 
                 try {
                     // Convert file to base64 for processing (works with private buckets)
@@ -197,16 +197,17 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                             console.log("Profile update result - data:", updateData, "error:", updateError);
 
                             if (!updateError) {
-                                toast.success("✨ AI extracted and saved your scores!", { id: "ai-extract" });
-                                // Dispatch custom event so Academic tab can refresh
+                                toast.success("✨ AI extracted and saved your information!", { id: "ai-extract" });
+                                // Dispatch custom event so tabs can refresh
                                 window.dispatchEvent(new CustomEvent('scores-updated'));
+                                window.dispatchEvent(new CustomEvent('profile-updated'));
                             } else {
-                                console.error("Error updating scores:", updateError);
-                                toast.error("Scores extracted but failed to save: " + (updateError.message || JSON.stringify(updateError)), { id: "ai-extract" });
+                                console.error("Error updating profile:", updateError);
+                                toast.error("Extracted but failed to save: " + (updateError.message || JSON.stringify(updateError)), { id: "ai-extract" });
                             }
                         } else {
                             toast.dismiss("ai-extract");
-                            toast.info("No scores could be extracted from the document");
+                            toast.info("No data could be extracted from the document");
                         }
                     } else {
                         toast.dismiss("ai-extract");
