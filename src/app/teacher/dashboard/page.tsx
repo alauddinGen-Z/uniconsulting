@@ -12,9 +12,11 @@ import WhatsAppChat from "@/components/chat/WhatsAppChat";
 import TeacherHomeDashboard from "@/components/teacher/TeacherHomeDashboard";
 import AdminPanel from "@/components/teacher/AdminPanel";
 import { TeacherDataProvider, useTeacherData } from "@/contexts/TeacherDataContext";
+import { Menu } from "lucide-react";
 
 function DashboardContent() {
     const [activeTab, setActiveTab] = useState("dashboard");
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { selectedStudentId, setSelectedStudentId } = useTeacherData();
 
     const handleTabChange = (tabId: string) => {
@@ -26,10 +28,31 @@ function DashboardContent() {
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-orange-50 via-white to-pink-50">
             {/* Sidebar */}
-            <TeacherSidebar activeTab={activeTab} onTabChange={handleTabChange} />
+            <TeacherSidebar
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                isMobileOpen={isMobileMenuOpen}
+                onMobileClose={() => setIsMobileMenuOpen(false)}
+            />
+
+            {/* Mobile Header */}
+            <div className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center px-4 z-30 md:hidden">
+                <button
+                    onClick={() => setIsMobileMenuOpen(true)}
+                    className="p-2 -ml-2 rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                    <Menu className="w-6 h-6 text-slate-700" />
+                </button>
+                <div className="flex items-center gap-2 ml-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white font-black text-sm">
+                        U
+                    </div>
+                    <span className="font-bold text-slate-900">UNI</span>
+                </div>
+            </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 ml-64 p-6 lg:p-8 overflow-hidden h-screen flex flex-col">
+            <main className="flex-1 md:ml-64 ml-0 p-4 md:p-6 lg:p-8 pt-20 md:pt-6 lg:pt-8 overflow-hidden h-screen flex flex-col">
                 {activeTab === 'pending' ? (
                     <PendingStudentsView />
                 ) : activeTab === 'students' ? (

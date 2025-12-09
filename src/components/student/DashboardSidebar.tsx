@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, LogOut, Settings, FolderOpen, Home, GraduationCap, MessageCircle, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { User, LogOut, Settings, FolderOpen, Home, GraduationCap, MessageCircle, Sparkles, X, Menu } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,9 +13,11 @@ import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 interface DashboardSidebarProps {
     activeTab: string;
     onTabChange: (tabId: string) => void;
+    isMobileOpen?: boolean;
+    onMobileClose?: () => void;
 }
 
-export default function DashboardSidebar({ activeTab, onTabChange }: DashboardSidebarProps) {
+export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen = false, onMobileClose }: DashboardSidebarProps) {
     const [profile, setProfile] = useState<{ full_name: string; email: string; teacher_name?: string } | null>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -64,6 +66,12 @@ export default function DashboardSidebar({ activeTab, onTabChange }: DashboardSi
         }
     };
 
+    const handleNavClick = (tabId: string) => {
+        onTabChange(tabId);
+        // Close mobile sidebar on navigation
+        if (onMobileClose) onMobileClose();
+    };
+
     const navItems = [
         { id: "home", label: "Home", icon: Home },
         { id: "profile", label: "Profile", icon: User },
@@ -74,8 +82,22 @@ export default function DashboardSidebar({ activeTab, onTabChange }: DashboardSi
 
     return (
         <>
+            {/* Mobile Backdrop */}
+            <AnimatePresence>
+                {isMobileOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                        onClick={onMobileClose}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Premium Dark Theme Sidebar */}
-            <div className="w-64 bg-slate-900 h-screen flex flex-col text-white shadow-2xl z-50 fixed left-0 top-0 border-r border-slate-800">
+            <div className={`w-64 bg-slate-900 h-screen flex flex-col text-white shadow-2xl z-50 fixed left-0 top-0 border-r border-slate-800 transition-transform duration-300 
+                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
                 {/* Logo Area */}
                 <div className="p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
@@ -94,7 +116,7 @@ export default function DashboardSidebar({ activeTab, onTabChange }: DashboardSi
                     {navItems.map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => onTabChange(item.id)}
+                            onClick={() => handleNavClick(item.id)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
                                 ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25 font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"

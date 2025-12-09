@@ -32,7 +32,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
         full_name: "",
-        phone: ""
+        phone: "",
+        date_of_birth: "",
+        preferred_country: "",
+        preferred_university: ""
     });
     const supabase = createClient();
 
@@ -84,7 +87,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             setProfile(profileData);
             setEditData({
                 full_name: data.full_name || "",
-                phone: data.phone || ""
+                phone: data.phone || "",
+                date_of_birth: data.date_of_birth || "",
+                preferred_country: data.preferred_country || "",
+                preferred_university: data.preferred_university || ""
             });
         } catch (error) {
             console.error("Error fetching profile:", error);
@@ -99,12 +105,22 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         setIsSaving(true);
 
         try {
+            // Build update object based on role
+            const updateData: Record<string, any> = {
+                full_name: editData.full_name,
+                phone: editData.phone
+            };
+
+            // Add student-specific fields
+            if (profile.role === 'student') {
+                updateData.date_of_birth = editData.date_of_birth || null;
+                updateData.preferred_country = editData.preferred_country || null;
+                updateData.preferred_university = editData.preferred_university || null;
+            }
+
             const { error } = await supabase
                 .from('profiles')
-                .update({
-                    full_name: editData.full_name,
-                    phone: editData.phone
-                })
+                .update(updateData)
                 .eq('id', profile.id);
 
             if (error) throw error;
@@ -173,7 +189,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         <div className="space-y-4">
                             {/* Editable Fields */}
                             {isEditing ? (
-                                <div className="space-y-4">
+                                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
                                         <input
@@ -191,6 +207,51 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                             placeholder="+1 234 567 8900"
                                         />
                                     </div>
+
+                                    {/* Student-specific fields */}
+                                    {profile?.role === 'student' && (
+                                        <>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Date of Birth</label>
+                                                <input
+                                                    type="date"
+                                                    value={editData.date_of_birth}
+                                                    onChange={(e) => setEditData({ ...editData, date_of_birth: e.target.value })}
+                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Preferred Country</label>
+                                                <select
+                                                    value={editData.preferred_country}
+                                                    onChange={(e) => setEditData({ ...editData, preferred_country: e.target.value })}
+                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+                                                >
+                                                    <option value="">-- Select Country --</option>
+                                                    <option value="USA">United States</option>
+                                                    <option value="UK">United Kingdom</option>
+                                                    <option value="Canada">Canada</option>
+                                                    <option value="Australia">Australia</option>
+                                                    <option value="Germany">Germany</option>
+                                                    <option value="Netherlands">Netherlands</option>
+                                                    <option value="Singapore">Singapore</option>
+                                                    <option value="Japan">Japan</option>
+                                                    <option value="South Korea">South Korea</option>
+                                                    <option value="China">China</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Target University</label>
+                                                <input
+                                                    value={editData.preferred_university}
+                                                    onChange={(e) => setEditData({ ...editData, preferred_university: e.target.value })}
+                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none"
+                                                    placeholder="e.g., Harvard, MIT, Oxford"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <>
@@ -212,10 +273,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                                     <p className="font-medium text-slate-800">{profile?.teacher_name}</p>
                                                 </div>
                                                 <div className={`px-3 py-1 rounded-full text-xs font-bold ${profile?.approval_status === 'approved'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : profile?.approval_status === 'rejected'
-                                                            ? 'bg-red-100 text-red-700'
-                                                            : 'bg-yellow-100 text-yellow-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : profile?.approval_status === 'rejected'
+                                                        ? 'bg-red-100 text-red-700'
+                                                        : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {profile?.approval_status || 'pending'}
                                                 </div>

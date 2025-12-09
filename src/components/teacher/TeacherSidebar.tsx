@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles, Shield } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,9 +13,11 @@ import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 interface TeacherSidebarProps {
     activeTab: string;
     onTabChange: (tabId: string) => void;
+    isMobileOpen?: boolean;
+    onMobileClose?: () => void;
 }
 
-export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSidebarProps) {
+export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = false, onMobileClose }: TeacherSidebarProps) {
     const [profile, setProfile] = useState<{ full_name: string; email: string; is_admin: boolean } | null>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -54,6 +56,12 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
         }
     };
 
+    const handleNavClick = (tabId: string) => {
+        onTabChange(tabId);
+        // Close mobile sidebar on navigation
+        if (onMobileClose) onMobileClose();
+    };
+
     const navItems = [
         { id: 'dashboard', label: 'Command Center', icon: LayoutGrid },
         { id: 'students', label: 'All Students', icon: Users },
@@ -66,8 +74,22 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
 
     return (
         <>
+            {/* Mobile Backdrop */}
+            <AnimatePresence>
+                {isMobileOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                        onClick={onMobileClose}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Premium Dark Theme Teacher Sidebar */}
-            <div className="w-64 bg-slate-900 h-screen flex flex-col text-white shadow-2xl z-50 fixed left-0 top-0 border-r border-slate-800">
+            <div className={`w-64 bg-slate-900 h-screen flex flex-col text-white shadow-2xl z-50 fixed left-0 top-0 border-r border-slate-800 transition-transform duration-300 
+                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
                 {/* Logo Area */}
                 <div className="p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
@@ -86,7 +108,7 @@ export default function TeacherSidebar({ activeTab, onTabChange }: TeacherSideba
                     {navItems.map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => onTabChange(item.id)}
+                            onClick={() => handleNavClick(item.id)}
                             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
                                 ? "bg-orange-600 text-white shadow-lg shadow-orange-600/25 font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
