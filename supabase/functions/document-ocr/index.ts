@@ -281,22 +281,31 @@ Replace with actual value. If not visible, use null.`;
     } else if (documentType === "passport") {
         prompt = `Analyze this passport document carefully. Extract the personal information.
 
+IMPORTANT: Many passports have text in BOTH local language (Cyrillic, Arabic, Chinese, etc.) AND English/Latin letters.
+You MUST extract ONLY the ENGLISH/LATIN version of each field. Ignore any Cyrillic, Arabic, or non-Latin text.
+
+For example:
+- If you see "ЖАМШИТБЕКОВ / ZHAMSHITBEKOV", extract only "ZHAMSHITBEKOV"
+- If you see "АЛАУДДИН / ALAUDDIN", extract only "ALAUDDIN"
+- Combine surname and given name as: "SURNAME GIVENNAME" (e.g., "ZHAMSHITBEKOV ALAUDDIN")
+
 Return ONLY a JSON object in this exact format (no other text):
 {
-    "full_name": "JOHN DOE",
+    "full_name": "ZHAMSHITBEKOV ALAUDDIN",
     "passport_number": "AB1234567",
-    "nationality": "UNITED STATES",
+    "nationality": "UZBEKISTAN",
     "date_of_birth": "1990-05-15",
     "passport_expiry": "2030-05-14",
     "gender": "male",
-    "city_of_birth": "NEW YORK"
+    "city_of_birth": "TASHKENT"
 }
 
 CRITICAL RULES:
-- Extract EXACTLY what you see in the document
+- Use ONLY English/Latin letters - NO Cyrillic, Arabic, or other scripts
+- For full_name: combine SURNAME and GIVEN NAME(S) in English only
 - For dates, use YYYY-MM-DD format
 - For gender, use "male" or "female" (lowercase)
-- For nationality, use the country name as shown
+- For nationality and city_of_birth, use the English name
 - If a field is not visible, use null`;
     } else if (documentType === "portrait") {
         prompt = `This is a portrait photo. Just confirm it shows a person's face.
