@@ -171,34 +171,84 @@ Return ONLY the JSON object, no other text.`;
         try {
             // Step 1: Clean up the response - remove markdown code blocks if present
             let cleanedText = text.trim();
+            console.log("Original text length:", cleanedText.length);
 
             // Remove ```json ... ``` or ``` ... ``` wrappers
             cleanedText = cleanedText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
 
-            // Step 2: Try to find JSON object in the response
-            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const jsonStr = jsonMatch[0];
+            // Also remove any leading/trailing backticks
+            cleanedText = cleanedText.replace(/^`+/, '').replace(/`+$/, '');
+
+            // Step 2: Find the outermost JSON object using bracket counting
+            let jsonStr = '';
+            let braceCount = 0;
+            let inString = false;
+            let escapeNext = false;
+            let startIndex = -1;
+
+            for (let i = 0; i < cleanedText.length; i++) {
+                const char = cleanedText[i];
+
+                if (escapeNext) {
+                    escapeNext = false;
+                    continue;
+                }
+
+                if (char === '\\' && inString) {
+                    escapeNext = true;
+                    continue;
+                }
+
+                if (char === '"' && !escapeNext) {
+                    inString = !inString;
+                }
+
+                if (!inString) {
+                    if (char === '{') {
+                        if (braceCount === 0) {
+                            startIndex = i;
+                        }
+                        braceCount++;
+                    } else if (char === '}') {
+                        braceCount--;
+                        if (braceCount === 0 && startIndex !== -1) {
+                            jsonStr = cleanedText.substring(startIndex, i + 1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (jsonStr) {
+                console.log("Found JSON object, length:", jsonStr.length);
                 feedback = JSON.parse(jsonStr);
 
-                // Validate required fields
+                // Validate and fix required fields
                 if (typeof feedback.overallScore !== 'number') {
                     feedback.overallScore = 5;
                 }
+                // Clamp score to 1-10
+                feedback.overallScore = Math.max(1, Math.min(10, Math.round(feedback.overallScore)));
+
                 if (!feedback.overallComment || typeof feedback.overallComment !== 'string') {
                     feedback.overallComment = "Review completed.";
                 }
 
+                // Ensure arrays exist
+                if (!Array.isArray(feedback.strengths)) feedback.strengths = [];
+                if (!Array.isArray(feedback.improvements)) feedback.improvements = [];
+                if (!Array.isArray(feedback.coachingPrompts)) feedback.coachingPrompts = [];
+
                 console.log("Successfully parsed feedback with score:", feedback.overallScore);
             } else {
-                throw new Error("No JSON object found in response");
+                throw new Error("No valid JSON object found in response");
             }
         } catch (e: any) {
             console.log("JSON parse failed:", e.message, "Using raw feedback");
-            // Fallback: extract key information from text
+            // Fallback: store raw but don't show as garbage
             feedback = {
                 overallScore: 5,
-                overallComment: "Analysis complete. The AI provided feedback below.",
+                overallComment: "AI analysis complete. Please see the detailed feedback below.",
                 rawFeedback: text.replace(/```json?\s*/gi, '').replace(/```/g, '').trim()
             };
         }
