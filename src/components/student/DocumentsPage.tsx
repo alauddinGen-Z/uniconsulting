@@ -216,13 +216,13 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                             console.error("OCR error:", result.error);
                             toast.error("AI extraction failed: " + result.error);
                         } else if (!result.extractedScores) {
-                            toast.info("Document scanned, but no scores were detected");
+                            toast.info("Document scanned, but no data was detected");
                         }
                     }
                 } catch (ocrError: any) {
                     console.error("OCR error:", ocrError);
                     toast.dismiss("ai-extract");
-                    toast.error("Failed to extract scores: " + (ocrError?.message || "Unknown error"));
+                    toast.error("Failed to extract data: " + (ocrError?.message || "Unknown error"));
                 }
             }
         } catch (error: any) {

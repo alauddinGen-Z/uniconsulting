@@ -366,19 +366,24 @@ Return the full extracted text first, then a structured summary.`;
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
     console.log("Extracted text:", text.substring(0, 200));
 
-    // Try to parse extracted scores from JSON response
+    // Try to parse extracted data from JSON response
     let extractedScores: ExtractedScores | undefined;
 
     if (documentType && documentType !== "other") {
         try {
-            // Try to extract JSON from the response
-            const jsonMatch = text.match(/\{[\s\S]*?\}/);
+            // Try to extract JSON from the response - use greedy match for nested objects
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
+                console.log("Found JSON string:", jsonMatch[0]);
                 extractedScores = JSON.parse(jsonMatch[0]);
-                console.log("Parsed scores:", extractedScores);
+                console.log("Parsed extracted data:", extractedScores);
+            } else {
+                console.log("No JSON found in response, trying text extraction");
+                extractedScores = extractScoresFromText(text, documentType);
             }
         } catch (e) {
-            console.log("Could not parse JSON scores, falling back to text extraction");
+            console.log("JSON parse failed:", e);
+            console.log("Falling back to text extraction for:", documentType);
             extractedScores = extractScoresFromText(text, documentType);
         }
     }
