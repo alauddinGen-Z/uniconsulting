@@ -1,25 +1,31 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { User, FileText, PenTool, CheckCircle, Clock, XCircle, ArrowRight, GraduationCap, Loader2, FolderOpen, TrendingUp, Calendar, MessageCircle, X, Target } from "lucide-react";
 import { motion } from "framer-motion";
-import { createClient } from "@/utils/supabase/client";
+import { useStudentData } from "@/contexts/StudentDataContext";
 
 interface HomeDashboardProps {
     onNavigate: (tab: string) => void;
 }
 
 export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
-    const [isLoading, setIsLoading] = useState(true);
-    const [profile, setProfile] = useState<any>(null);
-    const [stats, setStats] = useState({
-        documents: 0,
-        essays: 0,
-        profileComplete: 0
-    });
+    const { profile, documents, essays, isLoading, isDataReady, teacherName } = useStudentData();
     const [dismissedApprovalBanner, setDismissedApprovalBanner] = useState(false);
-    const hasFetched = useRef(false);
-    const supabase = createClient();
+
+    // Calculate stats from context data
+    const stats = useMemo(() => {
+        // Calculate profile completion
+        const fields = ['full_name', 'email', 'phone', 'passport_number', 'home_address', 'preferred_country', 'preferred_university'];
+        const filledFields = fields.filter(f => profile?.[f as keyof typeof profile]);
+        const completion = Math.round((filledFields.length / fields.length) * 100);
+
+        return {
+            documents: documents.length,
+            essays: essays.length,
+            profileComplete: completion
+        };
+    }, [profile, documents, essays]);
 
     // Check if approval banner was dismissed
     useEffect(() => {
@@ -34,60 +40,10 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         localStorage.setItem('dismissedApprovalBanner', 'true');
     };
 
-    // Only fetch once on first mount - not on every tab switch
-    useEffect(() => {
-        if (!hasFetched.current) {
-            hasFetched.current = true;
-            fetchData();
-        }
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            // Get profile
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*, teacher:teacher_id(full_name)')
-                .eq('id', user.id)
-                .single();
-
-            setProfile(profileData);
-
-            // Get document count
-            const { count: docCount } = await supabase
-                .from('documents')
-                .select('*', { count: 'exact', head: true })
-                .eq('student_id', user.id);
-
-            // Get essay count
-            const { count: essayCount } = await supabase
-                .from('essays')
-                .select('*', { count: 'exact', head: true })
-                .eq('student_id', user.id);
-
-            // Calculate profile completion
-            const fields = ['full_name', 'email', 'phone', 'passport_number', 'home_address', 'preferred_country', 'preferred_university'];
-            const filledFields = fields.filter(f => profileData?.[f]);
-            const completion = Math.round((filledFields.length / fields.length) * 100);
-
-            setStats({
-                documents: docCount || 0,
-                essays: essayCount || 0,
-                profileComplete: completion
-            });
-        } catch (error) {
-            console.error("Error fetching data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const greetingTime = new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening';
 
-    if (isLoading) {
+    // Show loading only on initial load, not when switching tabs
+    if (isLoading && !isDataReady) {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -121,18 +77,18 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                                 <span className="text-2xl">⚡</span>
                             </div>
                             <div>
-                                <span className="text-3xl font-black block leading-none">{profile?.xp_points || 0}</span>
+                                <span className="text-3xl font-black block leading-none">{(profile as any)?.xp_points || 0}</span>
                                 <span className="text-[10px] uppercase tracking-wider opacity-70">XP Points</span>
                             </div>
                         </div>
                         <div className="relative h-2 bg-black/20 rounded-full overflow-hidden">
                             <motion.div
                                 initial={{ width: 0 }}
-                                animate={{ width: `${Math.min(100, ((profile?.xp_points || 0) % 100))}%` }}
+                                animate={{ width: `${Math.min(100, (((profile as any)?.xp_points || 0) % 100))}%` }}
                                 className="absolute top-0 left-0 h-full bg-yellow-400 rounded-full"
                             />
                         </div>
-                        <p className="text-xs mt-2 font-medium">Level {profile?.level || 1} Scholar</p>
+                        <p className="text-xs mt-2 font-medium">Level {(profile as any)?.level || 1} Scholar</p>
                     </div>
                 </div>
             </div>
@@ -188,7 +144,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: "Teacher", value: profile?.teacher?.full_name || 'Not Assigned', icon: User, color: "blue", sub: "Your Consultant" },
+                    { label: "Teacher", value: teacherName || 'Not Assigned', icon: User, color: "blue", sub: "Your Consultant" },
                     { label: "Documents", value: stats.documents, icon: FolderOpen, color: "purple", sub: "Uploaded Files" },
                     { label: "Essays", value: stats.essays, icon: PenTool, color: "orange", sub: "Drafts & Finals" },
                     { label: "Profile", value: `${stats.profileComplete}%`, icon: TrendingUp, color: "emerald", sub: "Completion Rate" },

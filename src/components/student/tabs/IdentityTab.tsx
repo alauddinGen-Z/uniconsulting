@@ -120,6 +120,9 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
+            const oldTeacherId = currentTeacherId;
+
+            // 1. Update teacher_id in profile
             const { error } = await supabase
                 .from('profiles')
                 .update({
@@ -129,6 +132,68 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
                 .eq('id', user.id);
 
             if (error) throw error;
+
+            // 2. Handle chat: Delete old teacher conversation and create new one
+            if (oldTeacherId && oldTeacherId !== selectedNewTeacher) {
+                try {
+                    // Find old direct conversation with previous teacher
+                    const { data: myConversations } = await supabase
+                        .from('conversation_participants')
+                        .select('conversation_id')
+                        .eq('user_id', user.id);
+
+                    if (myConversations && myConversations.length > 0) {
+                        const convIds = myConversations.map(c => c.conversation_id);
+
+                        // Find conversations where old teacher is also a participant
+                        const { data: oldTeacherConvs } = await supabase
+                            .from('conversation_participants')
+                            .select('conversation_id')
+                            .eq('user_id', oldTeacherId)
+                            .in('conversation_id', convIds);
+
+                        if (oldTeacherConvs && oldTeacherConvs.length > 0) {
+                            for (const conv of oldTeacherConvs) {
+                                // Check if it's a direct (2-person) conversation
+                                const { data: participantCount } = await supabase
+                                    .from('conversation_participants')
+                                    .select('user_id')
+                                    .eq('conversation_id', conv.conversation_id);
+
+                                if (participantCount && participantCount.length === 2) {
+                                    // Delete the old direct conversation
+                                    await supabase.from('messages').delete().eq('conversation_id', conv.conversation_id);
+                                    await supabase.from('conversation_participants').delete().eq('conversation_id', conv.conversation_id);
+                                    await supabase.from('conversations').delete().eq('id', conv.conversation_id);
+                                    console.log('Deleted old teacher conversation:', conv.conversation_id);
+                                }
+                            }
+                        }
+                    }
+
+                    // Create new conversation with new teacher
+                    const { data: newConv, error: convError } = await supabase
+                        .from('conversations')
+                        .insert({
+                            type: 'direct',
+                            teacher_id: selectedNewTeacher
+                        })
+                        .select()
+                        .single();
+
+                    if (newConv && !convError) {
+                        // Add both participants
+                        await supabase.from('conversation_participants').insert([
+                            { conversation_id: newConv.id, user_id: user.id },
+                            { conversation_id: newConv.id, user_id: selectedNewTeacher }
+                        ]);
+                        console.log('Created new conversation with new teacher:', newConv.id);
+                    }
+                } catch (chatError) {
+                    console.error('Error updating chat:', chatError);
+                    // Don't fail the whole operation if chat update fails
+                }
+            }
 
             const newTeacher = teachers.find(t => t.id === selectedNewTeacher);
             setCurrentTeacherId(selectedNewTeacher);
