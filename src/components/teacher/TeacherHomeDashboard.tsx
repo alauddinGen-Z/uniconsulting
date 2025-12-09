@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
     Users, GraduationCap, FileText, Clock, TrendingUp,
     CheckCircle, AlertCircle, Calendar, Bell, MessageCircle,
@@ -48,10 +48,15 @@ export default function TeacherHomeDashboard() {
     const [activities, setActivities] = useState<Activity[]>([]);
     const [deadlines, setDeadlines] = useState<Deadline[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const hasFetched = useRef(false);
     const supabase = createClient();
 
+    // Only fetch once on first mount - not on every tab switch
     useEffect(() => {
-        fetchDashboardData();
+        if (!hasFetched.current) {
+            hasFetched.current = true;
+            fetchDashboardData();
+        }
     }, []);
 
     const fetchDashboardData = async () => {
