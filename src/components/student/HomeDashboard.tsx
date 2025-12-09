@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, FileText, PenTool, CheckCircle, Clock, XCircle, ArrowRight, GraduationCap, Loader2, FolderOpen, TrendingUp, Calendar, MessageCircle, X, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
@@ -18,6 +18,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         profileComplete: 0
     });
     const [dismissedApprovalBanner, setDismissedApprovalBanner] = useState(false);
+    const hasFetched = useRef(false);
     const supabase = createClient();
 
     // Check if approval banner was dismissed
@@ -33,8 +34,12 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         localStorage.setItem('dismissedApprovalBanner', 'true');
     };
 
+    // Only fetch once on first mount - not on every tab switch
     useEffect(() => {
-        fetchData();
+        if (!hasFetched.current) {
+            hasFetched.current = true;
+            fetchData();
+        }
     }, []);
 
     const fetchData = async () => {

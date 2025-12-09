@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, MapPin, Calendar, CreditCard, Globe, Save, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { User, MapPin, Calendar, CreditCard, Globe, Save, Loader2, RefreshCw } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
@@ -23,6 +23,11 @@ interface ProfileData {
     country: string;
 }
 
+interface Teacher {
+    id: string;
+    full_name: string;
+}
+
 export default function IdentityTab({ isLocked }: IdentityTabProps) {
     const [profile, setProfile] = useState<ProfileData>({
         full_name: "",
@@ -39,39 +44,95 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
+    const [currentTeacherName, setCurrentTeacherName] = useState<string>("");
+    const [showTeacherChange, setShowTeacherChange] = useState(false);
+    const [selectedNewTeacher, setSelectedNewTeacher] = useState<string>("");
+    const [isChangingTeacher, setIsChangingTeacher] = useState(false);
+    const hasFetched = useRef(false);
     const supabase = createClient();
 
+    // Only fetch once on first mount
     useEffect(() => {
-        const fetchProfile = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data } = await supabase
-                    .from('profiles')
-                    .select('full_name, email, phone, date_of_birth, gender, nationality, passport_number, passport_expiry, home_address, city, country')
-                    .eq('id', user.id)
-                    .single();
+        if (!hasFetched.current) {
+            hasFetched.current = true;
+            fetchProfile();
+            fetchTeachers();
+        }
+    }, []);
 
-                if (data) {
-                    setProfile({
-                        full_name: data.full_name || "",
-                        email: data.email || user.email || "",
-                        phone: data.phone || "",
-                        date_of_birth: data.date_of_birth || "",
-                        gender: data.gender || "",
-                        nationality: data.nationality || "",
-                        passport_number: data.passport_number || "",
-                        passport_expiry: data.passport_expiry || "",
-                        home_address: data.home_address || "",
-                        city: data.city || "",
-                        country: data.country || "",
-                    });
-                }
+    const fetchTeachers = async () => {
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('role', 'teacher')
+            .eq('approval_status', 'approved');
+        setTeachers(data || []);
+    };
+
+    const fetchProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase
+                .from('profiles')
+                .select('full_name, email, phone, date_of_birth, gender, nationality, passport_number, passport_expiry, home_address, city, country, teacher_id, teacher:teacher_id(full_name)')
+                .eq('id', user.id)
+                .single();
+
+            if (data) {
+                setProfile({
+                    full_name: data.full_name || "",
+                    email: data.email || user.email || "",
+                    phone: data.phone || "",
+                    date_of_birth: data.date_of_birth || "",
+                    gender: data.gender || "",
+                    nationality: data.nationality || "",
+                    passport_number: data.passport_number || "",
+                    passport_expiry: data.passport_expiry || "",
+                    home_address: data.home_address || "",
+                    city: data.city || "",
+                    country: data.country || "",
+                });
+                setCurrentTeacherId(data.teacher_id);
+                setCurrentTeacherName((data.teacher as any)?.full_name || "Not Assigned");
             }
-            setIsLoading(false);
-        };
+        }
+        setIsLoading(false);
+    };
 
-        fetchProfile();
-    }, [supabase]);
+    const handleChangeTeacher = async () => {
+        if (!selectedNewTeacher) return;
+
+        setIsChangingTeacher(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    teacher_id: selectedNewTeacher,
+                    approval_status: 'pending' // Reset to pending when changing teacher
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            const newTeacher = teachers.find(t => t.id === selectedNewTeacher);
+            setCurrentTeacherId(selectedNewTeacher);
+            setCurrentTeacherName(newTeacher?.full_name || "");
+            setShowTeacherChange(false);
+            setSelectedNewTeacher("");
+
+            toast.success("Teacher changed! Your account is now pending approval from the new teacher.");
+        } catch (error) {
+            console.error("Error changing teacher:", error);
+            toast.error("Failed to change teacher");
+        } finally {
+            setIsChangingTeacher(false);
+        }
+    };
 
     const handleChange = (field: keyof ProfileData, value: string) => {
         setProfile(prev => ({ ...prev, [field]: value }));
@@ -108,6 +169,72 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
 
     return (
         <div className="space-y-8">
+            {/* Current Teacher Section */}
+            <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <User className="w-5 h-5 text-blue-500" />
+                    Your Consultant
+                </h3>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                            {currentTeacherName?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                            <p className="font-bold text-slate-900">{currentTeacherName}</p>
+                            <p className="text-sm text-slate-500">Your assigned teacher/consultant</p>
+                        </div>
+                    </div>
+
+                    {!showTeacherChange ? (
+                        <button
+                            onClick={() => setShowTeacherChange(true)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-white rounded-xl border border-blue-200 hover:bg-blue-50 transition-colors"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Change Teacher
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <select
+                                value={selectedNewTeacher}
+                                onChange={(e) => setSelectedNewTeacher(e.target.value)}
+                                className="px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm"
+                            >
+                                <option value="">Select new teacher</option>
+                                {teachers.filter(t => t.id !== currentTeacherId).map(teacher => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.full_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleChangeTeacher}
+                                disabled={!selectedNewTeacher || isChangingTeacher}
+                                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            >
+                                {isChangingTeacher ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowTeacherChange(false);
+                                    setSelectedNewTeacher("");
+                                }}
+                                className="px-4 py-2 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-100 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {showTeacherChange && (
+                    <p className="mt-3 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
+                        ⚠️ Changing your teacher will reset your account to &quot;pending&quot; status. The new teacher will need to approve you.
+                    </p>
+                )}
+            </section>
+
             {/* Personal Information */}
             <section>
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
