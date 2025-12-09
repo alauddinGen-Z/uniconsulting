@@ -144,9 +144,16 @@ export default function IdentityTab({ isLocked }: IdentityTabProps) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
+            // Convert empty strings to null for date fields (PostgreSQL requires null, not "")
+            const dataToSave = {
+                ...profile,
+                date_of_birth: profile.date_of_birth || null,
+                passport_expiry: profile.passport_expiry || null,
+            };
+
             const { error } = await supabase
                 .from('profiles')
-                .update(profile)
+                .update(dataToSave)
                 .eq('id', user.id);
 
             if (error) throw error;
