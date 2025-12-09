@@ -1,87 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { UserCheck, X, Check, XCircle, Loader2 } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface PendingStudent {
-    id: string;
-    full_name: string;
-    email: string;
-    created_at: string;
-}
+import { useTeacherData } from "@/contexts/TeacherDataContext";
 
 interface FloatingPendingBadgeProps {
     onViewPending?: () => void;
 }
 
 export default function FloatingPendingBadge({ onViewPending }: FloatingPendingBadgeProps) {
-    const [pendingStudents, setPendingStudents] = useState<PendingStudent[]>([]);
+    // Use shared context data instead of independent fetching
+    const { pendingStudents, updateStudentStatus } = useTeacherData();
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const supabase = createClient();
 
-    const fetchPending = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data } = await supabase
-                .from('profiles')
-                .select('id, full_name, email, created_at')
-                .eq('teacher_id', user.id)
-                .eq('approval_status', 'pending')
-                .eq('role', 'student')
-                .order('created_at', { ascending: false });
-
-            setPendingStudents(data || []);
-        } catch (error) {
-            console.error("Error fetching pending:", error);
-        }
-    };
-
-    useEffect(() => {
-        fetchPending();
-
-        // Real-time subscription
-        const setupRealtime = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const channel = supabase
-                .channel('pending-badge-updates')
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'profiles',
-                    filter: `teacher_id=eq.${user.id}`
-                }, () => {
-                    fetchPending();
-                })
-                .subscribe();
-
-            return () => supabase.removeChannel(channel);
-        };
-
-        setupRealtime();
-    }, []);
+    // Note: Real-time updates are already handled by TeacherDataContext
 
     const handleApprove = async (studentId: string, studentName: string) => {
         setProcessingId(studentId);
         try {
-            const response = await fetch('/api/approve-student', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ studentId, action: 'approve' })
-            });
-
-            if (!response.ok) throw new Error('Failed to approve');
-
+            // Optimistic update via context
+            await updateStudentStatus(studentId, 'approved');
             toast.success(`${studentName} approved!`);
-            setPendingStudents(prev => prev.filter(s => s.id !== studentId));
         } catch (error) {
             toast.error("Failed to approve student");
         } finally {
@@ -92,16 +34,9 @@ export default function FloatingPendingBadge({ onViewPending }: FloatingPendingB
     const handleReject = async (studentId: string, studentName: string) => {
         setProcessingId(studentId);
         try {
-            const response = await fetch('/api/approve-student', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ studentId, action: 'reject' })
-            });
-
-            if (!response.ok) throw new Error('Failed to reject');
-
+            // Optimistic update via context
+            await updateStudentStatus(studentId, 'rejected');
             toast.success(`${studentName} rejected`);
-            setPendingStudents(prev => prev.filter(s => s.id !== studentId));
         } catch (error) {
             toast.error("Failed to reject student");
         } finally {

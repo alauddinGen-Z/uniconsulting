@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
@@ -21,6 +21,13 @@ interface Student {
     teacher_id?: string;
 }
 
+interface TeacherProfile {
+    id: string;
+    full_name: string;
+    email: string;
+    is_admin: boolean;
+}
+
 interface TeacherDataContextType {
     students: Student[];
     pendingStudents: Student[];
@@ -30,44 +37,69 @@ interface TeacherDataContextType {
         approved: number;
         rejected: number;
     };
+    teacherProfile: TeacherProfile | null;
     selectedStudentId: string | null;
     setSelectedStudentId: (id: string | null) => void;
     refreshData: () => Promise<void>;
     refreshStudents: () => Promise<void>;  // Alias for refreshData
     updateStudentStatus: (studentId: string, status: 'pending' | 'approved' | 'rejected') => Promise<void>;
-    isLoading: boolean;
+    isLoading: boolean;        // True only on initial load
+    isRefreshing: boolean;     // True during background refresh
+    isDataReady: boolean;      // True once initial data is loaded
 }
 
 const TeacherDataContext = createContext<TeacherDataContextType | undefined>(undefined);
 
 export function TeacherDataProvider({ children }: { children: ReactNode }) {
     const [students, setStudents] = useState<Student[]>([]);
+    const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [teacherId, setTeacherId] = useState<string | null>(null);
+    const hasInitialized = useRef(false);
     const supabase = createClient();
 
-    const fetchStudents = useCallback(async () => {
+    const fetchAllData = useCallback(async (isInitial = false) => {
+        if (isInitial) {
+            setIsLoading(true);
+        } else {
+            setIsRefreshing(true);
+        }
+
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
             setTeacherId(user.id);
 
-            // Fetch all students assigned to this teacher
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('role', 'student')
-                .eq('teacher_id', user.id)
-                .order('created_at', { ascending: false });
+            // Fetch teacher profile and students in parallel for speed
+            const [profileResult, studentsResult] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('id, full_name, email, is_admin')
+                    .eq('id', user.id)
+                    .single(),
+                supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('role', 'student')
+                    .eq('teacher_id', user.id)
+                    .order('created_at', { ascending: false })
+            ]);
 
-            if (error) throw error;
-            setStudents(data || []);
+            if (profileResult.data) {
+                setTeacherProfile(profileResult.data as TeacherProfile);
+            }
+
+            if (studentsResult.data) {
+                setStudents(studentsResult.data);
+            }
         } catch (error) {
-            console.error("Error fetching students:", error);
+            console.error("Error fetching data:", error);
         } finally {
             setIsLoading(false);
+            setIsRefreshing(false);
         }
     }, [supabase]);
 
@@ -91,13 +123,16 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
             console.error("Error updating status:", error);
             toast.error("Failed to update status. Reverting...");
             // Revert on error - refetch to get correct state
-            await fetchStudents();
+            await fetchAllData();
         }
-    }, [supabase, fetchStudents]);
+    }, [supabase, fetchAllData]);
 
     useEffect(() => {
-        fetchStudents();
-    }, [fetchStudents]);
+        if (!hasInitialized.current) {
+            hasInitialized.current = true;
+            fetchAllData(true); // Initial load
+        }
+    }, [fetchAllData]);
 
     // Set up real-time subscription
     useEffect(() => {
@@ -159,12 +194,15 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
         students,
         pendingStudents,
         stats,
+        teacherProfile,
         selectedStudentId,
         setSelectedStudentId,
-        refreshData: fetchStudents,
-        refreshStudents: fetchStudents,  // Alias for refreshData
+        refreshData: () => fetchAllData(false),
+        refreshStudents: () => fetchAllData(false),  // Alias for refreshData
         updateStudentStatus,
-        isLoading
+        isLoading,
+        isRefreshing,
+        isDataReady: !isLoading && students.length >= 0
     };
 
     return (
