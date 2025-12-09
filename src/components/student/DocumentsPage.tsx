@@ -5,6 +5,7 @@ import { Folder, Upload, FileText, File, Trash2, Loader2, Check, X, Plus, Camera
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { API_ENDPOINTS } from "@/lib/config";
+import { useStudentData } from "@/contexts/StudentDataContext";
 
 interface Document {
     id: string;
@@ -39,8 +40,11 @@ const documentCategories = [
 ];
 
 export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
+    // Use context for documents - instant loading on tab switch
+    const { documents: contextDocuments, isLoading: contextLoading, isDataReady, refreshDocuments } = useStudentData();
+
+    // Local state for UI interactions
     const [documents, setDocuments] = useState<Document[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [showCustomUpload, setShowCustomUpload] = useState(false);
@@ -53,28 +57,21 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
 
     const supabase = createClient();
 
+    // Sync local state with context
     useEffect(() => {
-        fetchDocuments();
-    }, []);
-
-    const fetchDocuments = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data } = await supabase
-                .from('documents')
-                .select('*')
-                .eq('student_id', user.id)
-                .order('created_at', { ascending: false });
-
-            setDocuments(data || []);
-        } catch (error) {
-            console.error("Error fetching documents:", error);
-        } finally {
-            setIsLoading(false);
+        if (contextDocuments) {
+            setDocuments(contextDocuments.map(d => ({
+                id: d.id,
+                type: d.type,
+                file_url: d.file_url,
+                status: 'uploaded',
+                created_at: d.uploaded_at
+            })));
         }
-    };
+    }, [contextDocuments]);
+
+    // Show loading only on initial load
+    const isLoading = contextLoading && !isDataReady;
 
     const handleUpload = async (categoryId: string, file: File, customName?: string) => {
         if (isLocked) {
@@ -121,7 +118,7 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
 
             const label = customName || documentCategories.find(c => c.id === categoryId)?.label || categoryId;
             toast.success(`${label} uploaded successfully!`);
-            fetchDocuments();
+            refreshDocuments();
             setShowCustomUpload(false);
             setCustomDocName("");
 
@@ -249,7 +246,7 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
             await supabase.from('documents').delete().eq('id', docId);
 
             toast.success("Document deleted");
-            fetchDocuments();
+            refreshDocuments();
         } catch (error) {
             toast.error("Failed to delete document");
         }
