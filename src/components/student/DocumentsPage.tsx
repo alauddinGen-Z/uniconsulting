@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { API_ENDPOINTS } from "@/lib/config";
 import { useStudentData } from "@/contexts/StudentDataContext";
+import { compressImageForOCR } from "@/lib/imageCompression";
 
 interface Document {
     id: string;
@@ -130,23 +131,10 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                 toast.loading("✨ AI is extracting information...", { id: "ai-extract" });
 
                 try {
-                    // Convert file to base64 for processing (works with private buckets)
-                    const reader = new FileReader();
-                    const base64Promise = new Promise<{ base64: string, mimeType: string }>((resolve, reject) => {
-                        reader.onload = () => {
-                            const result = reader.result as string;
-                            // Get MIME type from data URL
-                            const mimeType = result.split(';')[0].split(':')[1] || 'image/jpeg';
-                            // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
-                            const base64 = result.split(',')[1];
-                            resolve({ base64, mimeType });
-                        };
-                        reader.onerror = reject;
-                    });
-                    reader.readAsDataURL(file);
-                    const { base64: imageBase64, mimeType: detectedMimeType } = await base64Promise;
+                    // Compress image for faster OCR (resizes to max 1200px, 70% quality)
+                    const compressed = await compressImageForOCR(file, 1200, 0.7);
+                    console.log(`Image compressed: ${Math.round(compressed.originalSize / 1024)}KB → ${Math.round(compressed.compressedSize / 1024)}KB`);
 
-                    console.log("Got base64, length:", imageBase64.length, "MIME type:", detectedMimeType);
 
                     // Get session for authorization
                     const { data: { session } } = await supabase.auth.getSession();
@@ -159,9 +147,9 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                             'Authorization': `Bearer ${session?.access_token || ''}`
                         },
                         body: JSON.stringify({
-                            imageBase64: imageBase64,
+                            imageBase64: compressed.base64,
                             documentType: categoryId.toLowerCase(),
-                            mimeType: detectedMimeType
+                            mimeType: compressed.mimeType
                         })
                     });
 
