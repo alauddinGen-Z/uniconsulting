@@ -149,16 +149,30 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
 
                 {/* Profile Section */}
                 <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-                    <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all text-left mb-2 group">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-slate-300 font-bold border border-slate-700 group-hover:border-orange-500/50 transition-colors">
-                            {profile?.full_name?.charAt(0) || "T"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-white truncate">{profile?.full_name}</p>
-                            <p className="text-xs text-slate-500 truncate">{profile?.email}</p>
-                        </div>
-                        <Settings className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
-                    </button>
+                    <div className="flex items-center gap-2 mb-2">
+                        {/* Profile info - opens ProfileModal */}
+                        <button
+                            onClick={() => setShowProfileModal(true)}
+                            className="flex-1 flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all text-left group"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-slate-300 font-bold border border-slate-700 group-hover:border-orange-500/50 transition-colors">
+                                {profile?.full_name?.charAt(0) || "T"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm text-white truncate">{profile?.full_name || "Teacher"}</p>
+                                <p className="text-xs text-slate-500 truncate">{profile?.email}</p>
+                            </div>
+                        </button>
+
+                        {/* Settings button - opens SettingsModal */}
+                        <button
+                            onClick={() => setShowSettingsModal(true)}
+                            className="p-3 rounded-xl hover:bg-slate-800 transition-all group"
+                            title="Settings"
+                        >
+                            <Settings className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
+                        </button>
+                    </div>
 
                     <button
                         onClick={() => setShowLogoutConfirm(true)}
