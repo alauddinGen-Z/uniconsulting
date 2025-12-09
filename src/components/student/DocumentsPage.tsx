@@ -151,11 +151,15 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
 
                     console.log("Got base64, length:", imageBase64.length, "MIME type:", detectedMimeType);
 
+                    // Get session for authorization
+                    const { data: { session } } = await supabase.auth.getSession();
+
                     // Call OCR with document type for specialized extraction
                     const response = await fetch(API_ENDPOINTS.DOCUMENT_OCR, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session?.access_token || ''}`
                         },
                         body: JSON.stringify({
                             imageBase64: imageBase64,
