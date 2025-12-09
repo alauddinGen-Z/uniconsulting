@@ -62,15 +62,16 @@ export default function StudentDashboard() {
                             toast.success('🎉 Your account has been approved!');
                         } else if (payload.new.approval_status === 'rejected') {
                             toast.error('Your account was rejected.');
+                        } else if (payload.new.approval_status === 'pending') {
+                            toast.info('Your account is now pending approval.');
                         }
                     }
                 })
                 .subscribe();
         };
 
-        if (approvalStatus === 'pending' || approvalStatus === null) {
-            setupRealtime();
-        }
+        // Always subscribe to catch approval status changes (including after teacher change)
+        setupRealtime();
 
         return () => {
             if (channel) supabase.removeChannel(channel);
