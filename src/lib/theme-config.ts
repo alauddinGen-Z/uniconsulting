@@ -151,7 +151,7 @@ export const GLOBAL_COMPASS_THEME: ThemeConfig = {
  * CHANGE THIS TO SWITCH THEMES
  * Options: UNICONSULTING_THEME, GLOBAL_COMPASS_THEME, or create custom
  */
-export const ACTIVE_THEME: ThemeConfig = GLOBAL_COMPASS_THEME;
+export const ACTIVE_THEME: ThemeConfig = UNICONSULTING_THEME;
 
 // ============================================================================
 // HELPER FUNCTIONS
