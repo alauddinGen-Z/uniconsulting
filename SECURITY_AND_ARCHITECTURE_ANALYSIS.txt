@@ -1,0 +1,445 @@
+================================================================================
+UNICONSULTING - SECURITY AND ARCHITECTURE ANALYSIS
+Generated: 2025-12-10
+================================================================================
+
+================================================================================
+SECTION 1: DATABASE SCHEMA AND MULTI-TENANCY
+================================================================================
+
+QUESTION: Do all major tables (students, essays, documents) have an agency_id 
+or similar tenant identifier?
+
+ANSWER: NO - THERE IS NO MULTI-TENANT ARCHITECTURE
+
+The current database schema does NOT have any agency_id or tenant identifier.
+Tables are isolated by student_id (UUID) linked to the profiles table.
+
+Major Tables and Their Structure:
+---------------------------------
+1. profiles
+   - id (UUID, references auth.users)
+   - role (enum: 'student', 'teacher')
+   - teacher_id (UUID, references profiles) - for student-teacher assignment
+   - NO agency_id
+
+2. documents
+   - id (UUID)
+   - student_id (UUID, references profiles)
+   - type (enum: IELTS, TOEFL, SAT, GPA, Passport, etc.)
+   - file_url (TEXT)
+   - NO agency_id
+
+3. essays
+   - id (UUID)
+   - student_id (UUID, references profiles)
+   - NO agency_id
+
+4. student_universities
+   - id (UUID)
+   - student_id (UUID, references profiles)
+   - NO agency_id
+
+5. conversations, messages, conversation_participants
+   - Use participant-based access control
+   - NO agency_id
+
+IMPACT: Currently this is a SINGLE-TENANT application. To support multiple
+agencies/clients, you would need to:
+1. Add agency_id column to: profiles, documents, essays, student_universities
+2. Create an agencies table
+3. Update all RLS policies to include agency_id checks
+4. Implement agency-based routing/subdomain detection
+
+================================================================================
+SECTION 2: ROW LEVEL SECURITY (RLS) POLICIES
+================================================================================
+
+QUESTION: Show me the exact RLS policy for the documents table. Is it secure
+enough to prevent a student from guessing a URL and seeing someone else's passport?
+
+EXACT RLS POLICIES FOR DOCUMENTS TABLE (from fix_rls_performance.sql):
+----------------------------------------------------------------------
+
+-- SELECT Policy:
+CREATE POLICY "documents_select" ON documents FOR SELECT
+    USING (
+        student_id = (select auth.uid())
+        OR
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE id = (select auth.uid()) AND role = 'teacher'
+        )
+    );
+
+-- INSERT Policy:
+CREATE POLICY "documents_insert" ON documents FOR INSERT
+    WITH CHECK (
+        student_id = (select auth.uid())
+        OR
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE id = (select auth.uid()) AND role = 'teacher'
+        )
+    );
+
+-- UPDATE Policy:
+CREATE POLICY "documents_update" ON documents FOR UPDATE
+    USING (
+        student_id = (select auth.uid())
+        OR
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE id = (select auth.uid()) AND role = 'teacher'
+        )
+    );
+
+-- DELETE Policy:
+CREATE POLICY "documents_delete" ON documents FOR DELETE
+    USING (student_id = (select auth.uid()));
+
+SECURITY ASSESSMENT:
+--------------------
+✅ SECURE for database table access:
+   - Students can only SELECT their own documents
+   - Students cannot guess a document ID and access another student's record
+   - Teachers can view all documents (by design)
+
+⚠️  POTENTIAL VULNERABILITY: The file_url stored in documents points to
+Supabase Storage. The RLS on the documents TABLE doesn't protect the actual
+FILE in storage - that depends on STORAGE RLS policies.
+
+================================================================================
+SECTION 3: SUPABASE STORAGE RLS
+================================================================================
+
+QUESTION: Are we using Supabase Storage RLS for the actual file downloads?
+
+ANSWER: YES - STORAGE RLS IS IMPLEMENTED
+
+From supabase_schema.sql:
+-------------------------
+
+-- Storage Bucket Definition (private bucket):
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('documents', 'documents', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS Policies:
+
+-- Students can only access files in their own folder:
+CREATE POLICY "Give students access to own folder 1u57l0_0" 
+ON storage.objects FOR SELECT TO authenticated 
+USING (
+    bucket_id = 'documents' 
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Give students access to own folder 1u57l0_1" 
+ON storage.objects FOR INSERT TO authenticated 
+WITH CHECK (
+    bucket_id = 'documents' 
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Teachers can access all files:
+CREATE POLICY "Give teachers access to all 1u57l0_2" 
+ON storage.objects FOR SELECT TO authenticated 
+USING (
+    bucket_id = 'documents' 
+    AND EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = auth.uid() AND role = 'teacher'
+    )
+);
+
+SECURITY ASSESSMENT:
+--------------------
+✅ The storage bucket is PRIVATE (public = false)
+✅ Files must be stored in user-specific folders: /{user_id}/filename
+✅ Students can only access files in their own folder
+✅ Teachers can access all files
+
+PASSPORT URL GUESSING SCENARIO:
+-------------------------------
+If a student tries to guess another student's passport URL:
+1. The file_url in the documents table won't be returned (documents_select blocks it)
+2. Even if they somehow got the URL, Supabase Storage RLS will block the download
+   because the folder path won't match their auth.uid()
+
+VERDICT: ✅ SECURE against URL guessing attacks
+
+================================================================================
+SECTION 4: GOOGLE GEMINI API INTEGRATION
+================================================================================
+
+LOCATIONS OF GEMINI API CALLS:
+------------------------------
+1. /src/app/api/document-ocr/route.ts (Next.js API route)
+2. /src/app/api/ai-review/route.ts (Next.js API route)
+3. /supabase/functions/document-ocr/index.ts (Edge Function)
+4. /supabase/functions/ai-review/index.ts (Edge Function)
+5. /supabase/functions/university-matcher/index.ts (Edge Function)
+
+--------------------------------------------------------------------------------
+QUESTION: Do we have any rate limiting or quota tracking per agency?
+--------------------------------------------------------------------------------
+
+ANSWER: NO - NO RATE LIMITING OR QUOTA TRACKING EXISTS
+
+I searched the entire codebase for:
+- "rate limit" - NO RESULTS
+- "quota" - NO RESULTS
+- "throttle" - NO RESULTS
+
+CURRENT STATE:
+- Any authenticated user can call AI endpoints unlimited times
+- No per-user, per-agency, or global rate limits
+- No usage tracking or billing integration
+- The Gemini API has its own rate limits which will throw errors when exceeded
+
+RECOMMENDATIONS:
+1. Implement rate limiting middleware (e.g., Upstash Redis rate limiter)
+2. Add a usage_tracking table to record AI API calls per user
+3. Implement soft limits with warnings before hard blocks
+4. Consider adding agency-level quotas if multi-tenancy is implemented
+
+--------------------------------------------------------------------------------
+QUESTION: If the Gemini API fails (returns 500 or timeout), does the code crash,
+or does it have a retry mechanism?
+--------------------------------------------------------------------------------
+
+ANSWER: NO RETRY MECHANISM - FAILS IMMEDIATELY
+
+Example from /src/app/api/document-ocr/route.ts:
+
+```typescript
+try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+    const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        {
+            method: "POST",
+            // ... config
+            signal: controller.signal
+        }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!geminiResponse.ok) {
+        const errorText = await geminiResponse.text();
+        console.error("Gemini API HTTP error:", geminiResponse.status, errorText);
+        return NextResponse.json({
+            success: false,
+            error: `Gemini API error (${geminiResponse.status}): ${errorText.substring(0, 100)}`
+        }, { status: 500 });
+    }
+    // ... rest of code
+} catch (fetchError: any) {
+    console.error("Gemini API fetch error:", fetchError);
+    return NextResponse.json({
+        success: false,
+        error: `Failed to connect to AI service: ${fetchError.message || "Network error"}. Please try again.`
+    }, { status: 500 });
+}
+```
+
+CURRENT BEHAVIOR:
+- ✅ Has 60-second timeout (AbortController)
+- ❌ No retry logic on failure
+- ❌ Returns error immediately on first failure
+- ❌ No exponential backoff
+- ❌ No circuit breaker pattern
+
+RECOMMENDATIONS:
+1. Implement retry with exponential backoff (3 attempts: 1s, 2s, 4s delays)
+2. Add circuit breaker for cascading failure prevention
+3. Consider fallback responses for non-critical operations
+4. Log failures for monitoring
+
+--------------------------------------------------------------------------------
+QUESTION: Are we storing the result of the AI analysis in the database so we
+don't have to pay to re-analyze the same document twice?
+--------------------------------------------------------------------------------
+
+ANSWER: NO - NO CACHING OF AI RESULTS
+
+I searched for:
+- "ai_analysis" - NO RESULTS
+- "cached" - NO RESULTS
+- "analysis_result" - NO RESULTS
+
+CURRENT BEHAVIOR:
+- Every AI essay review is a fresh Gemini API call
+- Every document OCR is a fresh Gemini API call
+- Every university matching request is a fresh Gemini API call
+- No deduplication based on content hash
+- No caching layer
+
+COST IMPLICATIONS:
+- If a user clicks "Get AI Review" twice on the same essay = 2x API costs
+- If a document is re-uploaded = full OCR cost again
+
+RECOMMENDATIONS:
+1. Add ai_analysis_results table:
+   - id, document_id/essay_id, content_hash, analysis_json, created_at
+2. Before calling Gemini, check if content_hash already exists
+3. Return cached result if content hasn't changed
+4. Consider TTL for cache entries (e.g., 7 days)
+
+================================================================================
+SECTION 5: FRONTEND THEMING ANALYSIS
+================================================================================
+
+QUESTION: Are the Navbar, Logo, and Theme colors hardcoded in the codebase or
+dynamically loaded from the database based on the current domain/agency?
+
+ANSWER: 100% HARDCODED - NO DYNAMIC THEMING
+
+--------------------------------------------------------------------------------
+FILES CONTAINING HARDCODED BRANDING:
+--------------------------------------------------------------------------------
+
+1. /src/app/layout.tsx
+   - Title hardcoded: "UNI Language Hub"
+   - Fonts hardcoded: Montserrat, Inter
+
+2. /src/app/globals.css
+   - Color palette hardcoded:
+     --color-sunset-start: #E65100;
+     --color-sunset-end: #FF9800;
+     --color-electric-yellow: #FFEB3B;
+   - Extensive hardcoded orange theme in .join-button styles
+
+3. /src/components/student/DashboardSidebar.tsx (Lines 102-110)
+   HARDCODED LOGO:
+   ```tsx
+   <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-pink-500 
+        rounded-xl flex items-center justify-center text-white font-black text-xl 
+        shadow-lg shadow-orange-500/20">
+       U
+   </div>
+   <span className="font-black font-montserrat text-2xl tracking-tight text-white">
+       UNI
+   </span>
+   <p className="text-slate-400 text-xs">Student Portal</p>
+   ```
+   
+   HARDCODED COLORS THROUGHOUT:
+   - bg-slate-900 (sidebar background)
+   - bg-orange-500 (active nav item)
+   - from-orange-500 to-pink-500 (gradients)
+   - shadow-orange-500/20, shadow-orange-500/25
+
+4. /src/components/teacher/TeacherSidebar.tsx (Lines 94-102)
+   HARDCODED LOGO:
+   ```tsx
+   <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 
+        rounded-xl flex items-center justify-center text-white font-black text-xl 
+        shadow-lg shadow-orange-500/20">
+       U
+   </div>
+   <span className="font-black font-montserrat text-2xl tracking-tight text-white">
+       UNI
+   </span>
+   <p className="text-slate-400 text-xs">Teacher Console</p>
+   ```
+
+   HARDCODED COLORS:
+   - bg-orange-600 (active nav)
+   - from-blue-500 to-indigo-600 (teacher avatar)
+
+--------------------------------------------------------------------------------
+FILES TO MODIFY FOR A NEW CLIENT (RED THEME EXAMPLE):
+--------------------------------------------------------------------------------
+
+To deploy for a new client with RED colors instead of orange, you would need
+to modify the following files:
+
+MINIMUM REQUIRED CHANGES (7 files):
+-----------------------------------
+1. /src/app/layout.tsx
+   - Change title and description
+
+2. /src/app/globals.css
+   - Change --color-sunset-start: #E65100 → #DC2626
+   - Change --color-sunset-end: #FF9800 → #EF4444
+   - Update all orange-* references in CSS variables
+   - Update .join-button color scheme (~50 lines)
+
+3. /src/components/student/DashboardSidebar.tsx
+   - Logo letter "U" → new initial
+   - Brand name "UNI" → new name
+   - All orange-500 → red-500 (~10 occurrences)
+   - All orange-600 → red-600
+
+4. /src/components/teacher/TeacherSidebar.tsx
+   - Same changes as DashboardSidebar
+
+5. /src/components/shared/ProfileModal.tsx (if exists)
+   - Color updates
+
+6. /public/favicon.ico and /public/logo.png (if exists)
+   - Replace with new brand assets
+
+7. Any other components using orange-* or brand colors
+   - Search for "orange-500", "orange-600" across codebase
+
+ESTIMATED CHANGE COUNT:
+- ~150+ occurrences of "orange" in the codebase
+- ~50+ UI components with hardcoded colors
+- Significant manual effort required
+
+--------------------------------------------------------------------------------
+RECOMMENDATION FOR MULTI-TENANT/WHITE-LABEL SUPPORT:
+--------------------------------------------------------------------------------
+
+To make this properly themeable:
+
+1. Create agencies table:
+   CREATE TABLE agencies (
+       id UUID PRIMARY KEY,
+       domain TEXT UNIQUE,
+       name TEXT,
+       logo_url TEXT,
+       primary_color TEXT,
+       secondary_color TEXT,
+       accent_color TEXT,
+       meta_title TEXT,
+       custom_css TEXT
+   );
+
+2. Create theme context provider:
+   - Detect domain on server side
+   - Fetch agency config
+   - Provide via React Context
+
+3. Update CSS to use CSS variables:
+   - Replace hardcoded colors with var(--primary), var(--accent), etc.
+   - Inject agency-specific CSS variables at runtime
+
+4. Update components to use theme context:
+   - Logo from agency config
+   - Brand name from agency config
+   - Colors from CSS variables
+
+================================================================================
+SUMMARY OF FINDINGS
+================================================================================
+
+| Area                    | Status      | Risk Level | Recommendation           |
+|-------------------------|-------------|------------|--------------------------|
+| Multi-tenancy           | ❌ None     | HIGH       | Add agency_id to schema  |
+| Documents RLS           | ✅ Secure   | LOW        | Working as designed      |
+| Storage RLS             | ✅ Secure   | LOW        | Working as designed      |
+| Rate Limiting           | ❌ None     | MEDIUM     | Implement API rate limits|
+| Retry Mechanism         | ❌ None     | MEDIUM     | Add exponential backoff  |
+| AI Result Caching       | ❌ None     | MEDIUM     | Add caching layer        |
+| Theme Customization     | ❌ Hardcoded| HIGH       | Implement dynamic theming|
+
+================================================================================
+END OF ANALYSIS
+================================================================================

@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
+import { callGeminiWithRetry, GeminiAPIError } from "@/lib/gemini-client";
+import { getOrFetchAIResponseServer } from "@/lib/ai-cache-server";
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "");
+// AI Essay Review API - Now with retry logic, proper error handling, and caching
 
 const ESSAY_REVIEW_PROMPT = `You are an expert college admissions consultant specializing in personal statements and application essays. 
 
@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.GOOGLE_AI_API_KEY) {
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
       return NextResponse.json(
         { error: "AI service not configured" },
         { status: 500 }
@@ -70,12 +71,44 @@ export async function POST(request: NextRequest) {
       .replace("{{LIMIT}}", essayType === "UCAS" ? "4000 characters / 47 lines" : `${wordLimit} words`)
       .replace("{{ESSAY_CONTENT}}", content);
 
-    // Call Gemini - using stable model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Call Gemini with caching and retry logic
+    let text: string;
+    let fromCache = false;
+    try {
+      const result = await getOrFetchAIResponseServer<string>(
+        content, // Use essay content as cache key
+        'essay_review',
+        async () => {
+          return await callGeminiWithRetry(
+            apiKey,
+            {
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4096
+              }
+            },
+            {
+              maxRetries: 3,
+              timeoutMs: 60000
+            }
+          );
+        },
+        7 // Cache for 7 days (essays may be edited)
+      );
+      text = result.data;
+      fromCache = result.fromCache;
+      console.log(`[AI Review] Response received (fromCache: ${fromCache})`);
+    } catch (error: any) {
+      console.error("[AI Review] Gemini API error after retries:", error);
+      const message = error instanceof GeminiAPIError
+        ? error.message
+        : "AI service temporarily unavailable. Please try again.";
+      return NextResponse.json(
+        { error: message },
+        { status: error instanceof GeminiAPIError ? error.statusCode : 500 }
+      );
+    }
 
     // Parse JSON from response (handle markdown code blocks)
     let feedback;
@@ -88,6 +121,7 @@ export async function POST(request: NextRequest) {
       }
       feedback = JSON.parse(jsonText.trim());
     } catch (parseError) {
+      console.log("[AI Review] JSON parse failed, using raw feedback");
       feedback = {
         overallScore: 7,
         overallComment: "Review completed. See detailed feedback below.",
@@ -97,10 +131,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ feedback });
   } catch (error: any) {
-    console.error("AI Review Error:", error);
+    console.error("[AI Review] Unexpected error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate review" },
       { status: 500 }
     );
   }
 }
+

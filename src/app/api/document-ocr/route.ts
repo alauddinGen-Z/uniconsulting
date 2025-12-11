@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callGeminiWithRetry, GeminiAPIError } from '@/lib/gemini-client';
+import { getOrFetchAIResponseServer } from '@/lib/ai-cache-server';
 
 // Document OCR API - Extracts text and scores from academic documents
+// Now with retry logic, proper error handling, and caching
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -53,69 +56,59 @@ export async function POST(request: NextRequest) {
         // Build specialized prompt based on document type
         const prompt = buildPrompt(documentType);
 
-        let geminiResult;
+        // Create cache key from document content + type
+        const cacheInput = `${documentType}:${cleanBase64.substring(0, 1000)}`;
+
+        // Call Gemini API with caching and retry logic
+        let text: string;
+        let fromCache = false;
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-            const geminiResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                {
-                                    inline_data: {
-                                        mime_type: fileMimeType,
-                                        data: cleanBase64
+            const result = await getOrFetchAIResponseServer<string>(
+                cacheInput,
+                'ocr',
+                async () => {
+                    return await callGeminiWithRetry(
+                        geminiKey,
+                        {
+                            contents: [{
+                                parts: [
+                                    { text: prompt },
+                                    {
+                                        inline_data: {
+                                            mime_type: fileMimeType,
+                                            data: cleanBase64
+                                        }
                                     }
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            maxOutputTokens: 2048
+                                ]
+                            }],
+                            generationConfig: {
+                                temperature: 0.1,
+                                maxOutputTokens: 2048
+                            }
+                        },
+                        {
+                            maxRetries: 3,
+                            timeoutMs: 60000
                         }
-                    }),
-                    signal: controller.signal
-                }
+                    );
+                },
+                30 // Cache for 30 days
             );
-
-            clearTimeout(timeoutId);
-
-            if (!geminiResponse.ok) {
-                const errorText = await geminiResponse.text();
-                console.error("Gemini API HTTP error:", geminiResponse.status, errorText);
-                return NextResponse.json({
-                    success: false,
-                    error: `Gemini API error (${geminiResponse.status}): ${errorText.substring(0, 100)}`
-                }, { status: 500 });
-            }
-
-            geminiResult = await geminiResponse.json();
-        } catch (fetchError: any) {
-            console.error("Gemini API fetch error:", fetchError);
+            text = result.data;
+            fromCache = result.fromCache;
+            console.log(`[OCR] Response received (fromCache: ${fromCache})`);
+        } catch (error: any) {
+            console.error("Gemini API error after retries:", error);
+            const message = error instanceof GeminiAPIError
+                ? error.message
+                : "AI service temporarily unavailable. Please try again.";
             return NextResponse.json({
                 success: false,
-                error: `Failed to connect to AI service: ${fetchError.message || "Network error"}. Please try again.`
-            }, { status: 500 });
+                error: message
+            }, { status: error instanceof GeminiAPIError ? error.statusCode : 500 });
         }
 
-        console.log("Gemini response received");
-
-        if (geminiResult.error) {
-            console.error("Gemini API Error:", geminiResult.error);
-            return NextResponse.json({
-                success: false,
-                error: geminiResult.error.message || "Failed to process image"
-            });
-        }
-
-        const text = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        console.log("Extracted text from Gemini:", text);
+        console.log("Extracted text from Gemini:", text.substring(0, 100));
 
         // Try to parse extracted scores from JSON response
         let extractedScores: Record<string, string> | undefined;

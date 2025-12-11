@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { callGeminiWithRetry, GeminiAPIError } from '@/lib/gemini-client';
+import { getOrFetchAIResponseServer } from '@/lib/ai-cache-server';
+
+// University Matcher API - Now with retry logic, proper error handling, and caching
 
 export async function POST(request: NextRequest) {
     try {
@@ -130,7 +134,7 @@ Return ONLY valid JSON in this exact format:
   "summary": "2-sentence personalized summary explaining the recommendations"
 }`;
 
-        // Call Gemini API directly
+        // Get API key
         const geminiKey = process.env.GEMINI_API_KEY;
         if (!geminiKey) {
             return NextResponse.json(
@@ -139,40 +143,56 @@ Return ONLY valid JSON in this exact format:
             );
         }
 
-        const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 2048,
-                        responseMimeType: "application/json"
-                    }
-                }),
-            }
-        );
+        // Create cache key from student profile data
+        const cacheInput = `matcher:${studentId}:${profile.gpa || ''}:${profile.sat_total || ''}:${profile.ielts_overall || ''}:${profile.preferred_major || ''}`;
 
-        if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error('Gemini API error:', errorText);
+        // Call Gemini API with caching and retry logic
+        let content: string;
+        let fromCache = false;
+        try {
+            const result = await getOrFetchAIResponseServer<string>(
+                cacheInput,
+                'university_match',
+                async () => {
+                    return await callGeminiWithRetry(
+                        geminiKey,
+                        {
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 2048
+                            }
+                        },
+                        {
+                            maxRetries: 3,
+                            timeoutMs: 60000
+                        }
+                    );
+                },
+                7 // Cache for 7 days (student profile may change)
+            );
+            content = result.data;
+            fromCache = result.fromCache;
+            console.log(`[University Matcher] Response received (fromCache: ${fromCache})`);
+        } catch (error: any) {
+            console.error('[University Matcher] Gemini API error after retries:', error);
+            const message = error instanceof GeminiAPIError
+                ? error.message
+                : 'AI service temporarily unavailable. Please try again.';
             return NextResponse.json(
-                { success: false, error: 'AI service error' },
-                { status: 500 }
+                { success: false, error: message },
+                { status: error instanceof GeminiAPIError ? error.statusCode : 500 }
             );
         }
 
-        const result = await geminiResponse.json();
-        const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
+        // Parse the response
         try {
             const parsed = JSON.parse(content);
             return NextResponse.json({
                 success: true,
                 matches: parsed.matches || [],
-                summary: parsed.summary || ""
+                summary: parsed.summary || "",
+                fromCache
             });
         } catch {
             // Try to extract JSON from response
@@ -182,7 +202,8 @@ Return ONLY valid JSON in this exact format:
                 return NextResponse.json({
                     success: true,
                     matches: parsed.matches || [],
-                    summary: parsed.summary || ""
+                    summary: parsed.summary || "",
+                    fromCache
                 });
             }
             return NextResponse.json(
@@ -192,10 +213,11 @@ Return ONLY valid JSON in this exact format:
         }
 
     } catch (error) {
-        console.error('University matcher API error:', error);
+        console.error('[University Matcher] API error:', error);
         return NextResponse.json(
             { success: false, error: 'Internal server error' },
             { status: 500 }
         );
     }
 }
+

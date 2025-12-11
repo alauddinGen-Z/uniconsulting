@@ -1,12 +1,206 @@
+/**
+ * =============================================================================
+ * GLOBALS.CSS - WHITE-LABEL THEMING VERSION
+ * =============================================================================
+ * 
+ * This file has been refactored to support dynamic brand theming.
+ * 
+ * KEY CHANGES:
+ * 1. Added semantic CSS variables for brand colors
+ * 2. Replaced hardcoded orange/pink with brand-primary/brand-secondary
+ * 3. Added preset switching via CSS classes (.theme-uniconsulting, .theme-global-compass)
+ * 
+ * TO SWITCH THEMES:
+ * - Add class "theme-global-compass" to <html> element for blue theme
+ * - Default (no class) uses UniConsulting orange theme
+ * 
+ * =============================================================================
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* =============================================================================
+   BRAND THEME VARIABLES
+   ============================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------
+     DEFAULT THEME: UNICONSULTING (ORANGE)
+     --------------------------------------------------------------------- */
+
+  /* Primary Brand Color Scale (Orange) */
+  --brand-primary-50: #fff7ed;
+  --brand-primary-100: #ffedd5;
+  --brand-primary-200: #fed7aa;
+  --brand-primary-300: #fdba74;
+  --brand-primary-400: #fb923c;
+  --brand-primary-500: #f97316;
+  --brand-primary-600: #ea580c;
+  --brand-primary-700: #c2410c;
+  --brand-primary-800: #9a3412;
+  --brand-primary-900: #7c2d12;
+
+  /* Secondary Brand Color Scale (Pink) */
+  --brand-secondary-50: #fdf2f8;
+  --brand-secondary-100: #fce7f3;
+  --brand-secondary-200: #fbcfe8;
+  --brand-secondary-300: #f9a8d4;
+  --brand-secondary-400: #f472b6;
+  --brand-secondary-500: #ec4899;
+  --brand-secondary-600: #db2777;
+  --brand-secondary-700: #be185d;
+  --brand-secondary-800: #9d174d;
+  --brand-secondary-900: #831843;
+
+  /* Accent Color (for highlights, CTAs) */
+  --brand-accent-50: #fefce8;
+  --brand-accent-100: #fef9c3;
+  --brand-accent-200: #fef08a;
+  --brand-accent-300: #fde047;
+  --brand-accent-400: #facc15;
+  --brand-accent-500: #eab308;
+  --brand-accent-600: #ca8a04;
+  --brand-accent-700: #a16207;
+  --brand-accent-800: #854d0e;
+  --brand-accent-900: #713f12;
+
+  /* Surface Colors (backgrounds) */
+  --surface-base: #0f172a;
+  --surface-elevated: #1e293b;
+  --surface-overlay: #334155;
+  --surface-muted: #475569;
+
+  /* Branding */
+  --brand-logo-text: "UNI";
+  --brand-logo-icon: "U";
+}
+
+/* ---------------------------------------------------------------------
+   THEME: GLOBAL COMPASS (BLUE)
+   Apply by adding class="theme-global-compass" to <html>
+   --------------------------------------------------------------------- */
+
+.theme-global-compass,
+:root[data-theme="global-compass"] {
+  /* Primary Brand Color Scale (Blue) */
+  --brand-primary-50: #eff6ff;
+  --brand-primary-100: #dbeafe;
+  --brand-primary-200: #bfdbfe;
+  --brand-primary-300: #93c5fd;
+  --brand-primary-400: #60a5fa;
+  --brand-primary-500: #3b82f6;
+  --brand-primary-600: #2563eb;
+  --brand-primary-700: #1d4ed8;
+  --brand-primary-800: #1e40af;
+  --brand-primary-900: #1e3a8a;
+
+  /* Secondary Brand Color Scale (Teal/Cyan) */
+  --brand-secondary-50: #ecfeff;
+  --brand-secondary-100: #cffafe;
+  --brand-secondary-200: #a5f3fc;
+  --brand-secondary-300: #67e8f9;
+  --brand-secondary-400: #22d3ee;
+  --brand-secondary-500: #06b6d4;
+  --brand-secondary-600: #0891b2;
+  --brand-secondary-700: #0e7490;
+  --brand-secondary-800: #155e75;
+  --brand-secondary-900: #164e63;
+
+  /* Accent Color (Green for success states) */
+  --brand-accent-50: #f0fdf4;
+  --brand-accent-100: #dcfce7;
+  --brand-accent-200: #bbf7d0;
+  --brand-accent-300: #86efac;
+  --brand-accent-400: #4ade80;
+  --brand-accent-500: #22c55e;
+  --brand-accent-600: #16a34a;
+  --brand-accent-700: #15803d;
+  --brand-accent-800: #166534;
+  --brand-accent-900: #14532d;
+}
+
+/* ---------------------------------------------------------------------
+   THEME: CUSTOM RED (Example for future clients)
+   --------------------------------------------------------------------- */
+
+.theme-red-brand,
+:root[data-theme="red-brand"] {
+  --brand-primary-50: #fef2f2;
+  --brand-primary-100: #fee2e2;
+  --brand-primary-200: #fecaca;
+  --brand-primary-300: #fca5a5;
+  --brand-primary-400: #f87171;
+  --brand-primary-500: #ef4444;
+  --brand-primary-600: #dc2626;
+  --brand-primary-700: #b91c1c;
+  --brand-primary-800: #991b1b;
+  --brand-primary-900: #7f1d1d;
+
+  --brand-secondary-50: #fefce8;
+  --brand-secondary-100: #fef9c3;
+  --brand-secondary-200: #fef08a;
+  --brand-secondary-300: #fde047;
+  --brand-secondary-400: #facc15;
+  --brand-secondary-500: #eab308;
+  --brand-secondary-600: #ca8a04;
+  --brand-secondary-700: #a16207;
+  --brand-secondary-800: #854d0e;
+  --brand-secondary-900: #713f12;
+}
+
+/* =============================================================================
+   TAILWIND THEME EXTENSION
+   Maps CSS variables to Tailwind color utilities
+   ============================================================================= */
+
 @theme inline {
-  --color-sunset-start: #E65100;
-  --color-sunset-end: #FF9800;
-  --color-electric-yellow: #FFEB3B;
+  /* Brand Colors - use as bg-brand-primary, text-brand-secondary-600, etc. */
+  --color-brand-primary-50: var(--brand-primary-50);
+  --color-brand-primary-100: var(--brand-primary-100);
+  --color-brand-primary-200: var(--brand-primary-200);
+  --color-brand-primary-300: var(--brand-primary-300);
+  --color-brand-primary-400: var(--brand-primary-400);
+  --color-brand-primary-500: var(--brand-primary-500);
+  --color-brand-primary-600: var(--brand-primary-600);
+  --color-brand-primary-700: var(--brand-primary-700);
+  --color-brand-primary-800: var(--brand-primary-800);
+  --color-brand-primary-900: var(--brand-primary-900);
+
+  --color-brand-secondary-50: var(--brand-secondary-50);
+  --color-brand-secondary-100: var(--brand-secondary-100);
+  --color-brand-secondary-200: var(--brand-secondary-200);
+  --color-brand-secondary-300: var(--brand-secondary-300);
+  --color-brand-secondary-400: var(--brand-secondary-400);
+  --color-brand-secondary-500: var(--brand-secondary-500);
+  --color-brand-secondary-600: var(--brand-secondary-600);
+  --color-brand-secondary-700: var(--brand-secondary-700);
+  --color-brand-secondary-800: var(--brand-secondary-800);
+  --color-brand-secondary-900: var(--brand-secondary-900);
+
+  --color-brand-accent-50: var(--brand-accent-50);
+  --color-brand-accent-100: var(--brand-accent-100);
+  --color-brand-accent-200: var(--brand-accent-200);
+  --color-brand-accent-300: var(--brand-accent-300);
+  --color-brand-accent-400: var(--brand-accent-400);
+  --color-brand-accent-500: var(--brand-accent-500);
+  --color-brand-accent-600: var(--brand-accent-600);
+  --color-brand-accent-700: var(--brand-accent-700);
+  --color-brand-accent-800: var(--brand-accent-800);
+  --color-brand-accent-900: var(--brand-accent-900);
+
+  /* Surface Colors */
+  --color-surface-base: var(--surface-base);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-muted: var(--surface-muted);
+
+  /* Legacy color mappings (keep existing theme working) */
+  --color-sunset-start: var(--brand-primary-700);
+  --color-sunset-end: var(--brand-primary-400);
+  --color-electric-yellow: var(--brand-accent-400);
   --color-status-green: #10B981;
   --color-status-red: #EF4444;
 
@@ -49,6 +243,10 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
 body {
   font-family: var(--font-inter), sans-serif;
   min-height: 100vh;
@@ -63,13 +261,33 @@ h6 {
   font-family: var(--font-montserrat), sans-serif;
 }
 
-/* Custom Utilities */
+/* =============================================================================
+   CUSTOM UTILITIES
+   ============================================================================= */
+
 .glass-panel {
   @apply bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl;
 }
 
 .btn-primary {
-  @apply bg-electric-yellow text-slate-900 font-extrabold px-6 py-3 rounded-xl hover:scale-105 transition-transform active:scale-95 shadow-lg;
+  @apply bg-brand-accent-400 text-slate-900 font-extrabold px-6 py-3 rounded-xl hover:scale-105 transition-transform active:scale-95 shadow-lg;
+}
+
+/* Brand gradient utilities */
+.bg-brand-gradient {
+  background: linear-gradient(to bottom right, var(--brand-primary-500), var(--brand-secondary-500));
+}
+
+.bg-brand-gradient-subtle {
+  background: linear-gradient(to bottom right, var(--brand-primary-400), var(--brand-primary-600));
+}
+
+.shadow-brand {
+  box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--brand-primary-500) 25%, transparent);
+}
+
+.shadow-brand-lg {
+  box-shadow: 0 20px 40px -10px color-mix(in srgb, var(--brand-primary-500) 30%, transparent);
 }
 
 /* Hide scrollbar utility */
@@ -77,14 +295,17 @@ h6 {
   display: none;
 }
 
-/* Join Button - Animated (Orange Theme) */
+/* =============================================================================
+   JOIN BUTTON - Uses brand variables
+   ============================================================================= */
+
 .join-button {
-  --white: #fff7ed;
-  --orange-100: #fed7aa;
-  --orange-200: #fdba74;
-  --orange-300: #fb923c;
-  --orange-400: #f97316;
-  --orange-500: #c2410c;
+  --white: var(--brand-primary-50);
+  --btn-100: var(--brand-primary-100);
+  --btn-200: var(--brand-primary-200);
+  --btn-300: var(--brand-primary-300);
+  --btn-400: var(--brand-primary-400);
+  --btn-500: var(--brand-primary-700);
   --radius: 18px;
 
   border-radius: var(--radius);
@@ -114,18 +335,18 @@ h6 {
   position: absolute;
   inset: 0;
   border-radius: calc(var(--radius) * 1.1);
-  background: var(--orange-500);
+  background: var(--btn-500);
 }
 
 .join-button .bg::before {
   filter: blur(5px);
   transition: all 0.3s ease;
   box-shadow:
-    -7px 6px 0 0 rgb(194 65 12 / 40%),
-    -14px 12px 0 0 rgb(194 65 12 / 30%),
-    -21px 18px 4px 0 rgb(194 65 12 / 25%),
-    -28px 24px 8px 0 rgb(194 65 12 / 15%),
-    -35px 30px 12px 0 rgb(194 65 12 / 12%);
+    -7px 6px 0 0 color-mix(in srgb, var(--brand-primary-700) 40%, transparent),
+    -14px 12px 0 0 color-mix(in srgb, var(--brand-primary-700) 30%, transparent),
+    -21px 18px 4px 0 color-mix(in srgb, var(--brand-primary-700) 25%, transparent),
+    -28px 24px 8px 0 color-mix(in srgb, var(--brand-primary-700) 15%, transparent),
+    -35px 30px 12px 0 color-mix(in srgb, var(--brand-primary-700) 12%, transparent);
 }
 
 .join-button .wrap {
@@ -134,9 +355,7 @@ h6 {
   height: 100%;
   transform: translate(6px, -6px);
   padding: 3px;
-  background: linear-gradient(to bottom,
-      var(--orange-100) 0%,
-      var(--orange-400) 100%);
+  background: linear-gradient(to bottom, var(--btn-100), var(--btn-400));
   position: relative;
   transition: all 0.3s ease;
 }
@@ -158,10 +377,7 @@ h6 {
   width: 120px;
   height: 300px;
   margin: auto;
-  background: linear-gradient(to right,
-      transparent 0%,
-      white 50%,
-      transparent 100%);
+  background: linear-gradient(to right, transparent 0%, white 50%, transparent 100%);
   animation: joinSpin 3s linear infinite;
   animation-play-state: paused;
 }
@@ -178,11 +394,9 @@ h6 {
   border-radius: calc(var(--radius) * 0.85);
   font-weight: 700;
   transition: all 0.3s ease;
-  background: linear-gradient(to bottom,
-      var(--orange-300) 0%,
-      var(--orange-400) 100%);
+  background: linear-gradient(to bottom, var(--btn-300), var(--btn-400));
   box-shadow:
-    inset -2px 12px 11px -5px var(--orange-200),
+    inset -2px 12px 11px -5px var(--btn-200),
     inset 1px -3px 11px 0px rgb(0 0 0 / 35%);
 }
 
@@ -196,7 +410,7 @@ h6 {
   bottom: 35%;
   opacity: 0.7;
   margin: auto;
-  background: linear-gradient(to bottom, transparent, var(--orange-400));
+  background: linear-gradient(to bottom, transparent, var(--btn-400));
   filter: brightness(1.3) blur(5px);
 }
 
@@ -230,7 +444,7 @@ h6 {
   content: attr(data-label);
   position: absolute;
   color: var(--white);
-  text-shadow: -1px 1px 2px var(--orange-500);
+  text-shadow: -1px 1px 2px var(--btn-500);
   left: 0;
 }
 
@@ -275,9 +489,9 @@ h6 {
 .join-button .icon div {
   position: relative;
   width: 20px;
-  box-shadow: -2px 2px 5px var(--orange-400);
+  box-shadow: -2px 2px 5px var(--btn-400);
   transform: scale(0.9);
-  background: linear-gradient(to bottom, var(--white), var(--orange-100));
+  background: linear-gradient(to bottom, var(--white), var(--btn-100));
   animation: joinSwingArrow 1s ease-in-out infinite;
   animation-play-state: paused;
 }
@@ -285,7 +499,7 @@ h6 {
 .join-button .icon div::before {
   transform: rotate(44deg);
   top: 1px;
-  box-shadow: 1px -2px 3px -1px var(--orange-400);
+  box-shadow: 1px -2px 3px -1px var(--btn-400);
   animation: joinRotateArrowLine 1s linear infinite;
   animation-play-state: paused;
 }
@@ -293,8 +507,8 @@ h6 {
 .join-button .icon div::after {
   bottom: 1px;
   transform: rotate(316deg);
-  box-shadow: -2px 2px 3px 0 var(--orange-400);
-  background: linear-gradient(200deg, var(--white), var(--orange-100));
+  box-shadow: -2px 2px 3px 0 var(--btn-400);
+  background: linear-gradient(200deg, var(--white), var(--btn-100));
   animation: joinRotateArrowLine2 1s linear infinite;
   animation-play-state: paused;
 }
@@ -318,7 +532,7 @@ h6 {
   stroke-dasharray: 60 60;
   stroke-dashoffset: 60;
   transform: translate(-17%, -31%);
-  stroke: var(--orange-300);
+  stroke: var(--btn-300);
 }
 
 /* Join Button States */
@@ -350,14 +564,14 @@ h6 {
   filter: blur(5px);
   opacity: 0.7;
   box-shadow:
-    -7px 6px 0 0 rgb(194 65 12 / 40%),
-    -14px 12px 0 0 rgb(194 65 12 / 25%);
+    -7px 6px 0 0 color-mix(in srgb, var(--brand-primary-700) 40%, transparent),
+    -14px 12px 0 0 color-mix(in srgb, var(--brand-primary-700) 25%, transparent);
 }
 
 .join-button:active .content {
   box-shadow:
-    inset -1px 12px 8px -5px rgba(194, 65, 12, 0.4),
-    inset 0px -3px 8px 0px var(--orange-200);
+    inset -1px 12px 8px -5px color-mix(in srgb, var(--brand-primary-700) 40%, transparent),
+    inset 0px -3px 8px 0px var(--btn-200);
 }
 
 .join-button:active .outline {
@@ -389,7 +603,10 @@ h6 {
   animation: joinCharAppear 1s ease backwards calc(var(--i) * 0.03s);
 }
 
-/* Join Button Keyframes */
+/* =============================================================================
+   KEYFRAMES
+   ============================================================================= */
+
 @keyframes joinSpin {
   0% {
     transform: rotate(0deg);
@@ -501,7 +718,7 @@ h6 {
 
   to {
     stroke-dashoffset: -480;
-    stroke: #fed7aa;
+    stroke: var(--brand-primary-100);
   }
 }
 
@@ -512,7 +729,10 @@ h6 {
   }
 }
 
-/* Loading Spinner - 5 Squares Animation */
+/* =============================================================================
+   LOADING SPINNER - Uses brand variables
+   ============================================================================= */
+
 .loadingspinner {
   --square: 26px;
   --offset: 30px;
@@ -532,7 +752,7 @@ h6 {
 
 .loadingspinner div {
   display: inline-block;
-  background: #f97316;
+  background: var(--brand-primary-500);
   border: none;
   border-radius: 4px;
   width: var(--square);
@@ -756,6 +976,10 @@ h6 {
   }
 }
 
+/* =============================================================================
+   SHADCN/UI VARIABLES
+   ============================================================================= */
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -798,7 +1022,7 @@ h6 {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
+  --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -823,13 +1047,4 @@ h6 {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
 }

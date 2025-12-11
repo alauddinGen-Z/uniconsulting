@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
 import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
+import { ACTIVE_THEME } from "@/lib/theme-config";
 
 interface DashboardSidebarProps {
     activeTab: string;
@@ -100,14 +101,14 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
                 {/* Logo Area */}
                 <div className="p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
                     <div className="relative z-10 flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-orange-500/20">
-                            U
+                        <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center text-white font-black text-xl shadow-brand">
+                            {ACTIVE_THEME.branding.logoIcon}
                         </div>
-                        <span className="font-black font-montserrat text-2xl tracking-tight text-white">UNI</span>
+                        <span className="font-black font-montserrat text-2xl tracking-tight text-white">{ACTIVE_THEME.branding.logoText}</span>
                     </div>
-                    <p className="text-slate-400 text-xs font-medium ml-1 relative z-10">Student Portal</p>
+                    <p className="text-slate-400 text-xs font-medium ml-1 relative z-10">{ACTIVE_THEME.branding.tagline}</p>
                 </div>
 
                 {/* Navigation */}
@@ -118,7 +119,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                             key={item.id}
                             onClick={() => handleNavClick(item.id)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
-                                ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25 font-bold"
+                                ? "bg-brand-primary-500 text-white shadow-lg shadow-brand font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
                                 }`}
                         >
@@ -147,7 +148,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                 {/* Profile Section */}
                 <div className="p-4 border-t border-slate-800 bg-slate-900/50">
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold shadow-lg shadow-orange-500/20">
+                        <div className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center text-white font-bold shadow-brand">
                             {profile?.full_name?.charAt(0) || "S"}
                         </div>
                         <div className="flex-1 min-w-0">
