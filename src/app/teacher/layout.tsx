@@ -11,7 +11,6 @@
  */
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import FloatingPendingBadge from "@/components/teacher/FloatingPendingBadge";
 import { TeacherDataProvider } from "@/contexts/TeacherDataContext";
@@ -57,20 +56,11 @@ export default function TeacherLayout({
                     </div>
                 </div>
 
-                {/* Main Content Area - Only this transitions */}
+                {/* Main Content Area - Instant render, no animation */}
                 <main className="flex-1 md:ml-64 ml-0 p-4 md:p-6 lg:p-8 pt-20 md:pt-6 lg:pt-8 overflow-hidden h-screen flex flex-col">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={pathname}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="flex-1 flex flex-col min-h-0"
-                        >
-                            {children}
-                        </motion.div>
-                    </AnimatePresence>
+                    <div className="flex-1 flex flex-col min-h-0">
+                        {children}
+                    </div>
                 </main>
 
                 {/* Floating Pending Approvals Badge - Persistent */}
