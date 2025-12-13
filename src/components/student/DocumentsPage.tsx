@@ -65,8 +65,8 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                 id: d.id,
                 type: d.type,
                 file_url: d.file_url,
-                status: 'uploaded',
-                created_at: d.uploaded_at
+                status: d.status || 'uploaded',
+                created_at: d.created_at
             })));
         }
     }, [contextDocuments]);

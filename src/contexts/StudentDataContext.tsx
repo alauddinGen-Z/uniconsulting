@@ -46,10 +46,9 @@ interface Document {
     id: string;
     student_id: string;
     type: string;
-    file_name: string;
     file_url: string;
-    file_size: number;
-    uploaded_at: string;
+    status: string;
+    created_at: string;
 }
 
 interface Essay {
@@ -146,7 +145,7 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             .from('documents')
             .select('*')
             .eq('student_id', user.id)
-            .order('uploaded_at', { ascending: false });
+            .order('created_at', { ascending: false });
 
         setDocuments(data || []);
     }, [supabase]);
