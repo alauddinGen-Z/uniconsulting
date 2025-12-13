@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 
 interface Stats {
     totalStudents: number;
@@ -36,34 +37,28 @@ interface Deadline {
     type: string;
 }
 
+// Helper function - outside component for use in useQuery
+const formatTimeAgo = (date: Date): string => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+};
+
 export default function TeacherHomeDashboard() {
-    const [stats, setStats] = useState<Stats>({
-        totalStudents: 0,
-        pendingApprovals: 0,
-        approvedStudents: 0,
-        totalDocuments: 0,
-        completedApplications: 0,
-        upcomingDeadlines: 0
-    });
-    const [activities, setActivities] = useState<Activity[]>([]);
-    const [deadlines, setDeadlines] = useState<Deadline[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const hasFetched = useRef(false);
     const supabase = createClient();
 
-    // Only fetch once on first mount - not on every tab switch
-    useEffect(() => {
-        if (!hasFetched.current) {
-            hasFetched.current = true;
-            fetchDashboardData();
-        }
-    }, []);
-
-    const fetchDashboardData = async () => {
-        setIsLoading(true);
-        try {
+    // React Query for dashboard data - instant on tab switch!
+    const { data: dashboardData, isLoading } = useQuery({
+        queryKey: ['teacher', 'dashboard'],
+        queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) throw new Error("Not authenticated");
 
             // Fetch student stats
             const { data: students } = await supabase
@@ -88,7 +83,7 @@ export default function TeacherHomeDashboard() {
             }
 
             // Fetch upcoming deadlines
-            let upcomingDeadlines: Deadline[] = [];
+            let deadlines: Deadline[] = [];
             if (studentIds.length > 0) {
                 const { data: deadlineData } = await supabase
                     .from('student_universities')
@@ -99,7 +94,7 @@ export default function TeacherHomeDashboard() {
                     .limit(5);
 
                 if (deadlineData) {
-                    upcomingDeadlines = await Promise.all(deadlineData.map(async (d) => {
+                    deadlines = deadlineData.map((d) => {
                         const student = students?.find(s => s.id === d.student_id);
                         const daysLeft = Math.ceil((new Date(d.deadline_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                         return {
@@ -110,14 +105,12 @@ export default function TeacherHomeDashboard() {
                             daysLeft,
                             type: d.deadline_type
                         };
-                    }));
+                    });
                 }
             }
 
-            // Build activity feed from recent data
-            const recentActivities: Activity[] = [];
-
-            // Recent student signups
+            // Build activity feed
+            const activities: Activity[] = [];
             const recentStudents = students?.filter(s => {
                 const created = new Date(s.created_at);
                 const daysDiff = (new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
@@ -125,7 +118,7 @@ export default function TeacherHomeDashboard() {
             }) || [];
 
             recentStudents.forEach(s => {
-                recentActivities.push({
+                activities.push({
                     id: `student-${s.id}`,
                     type: 'approval',
                     title: s.approval_status === 'pending' ? 'New Student Signup' : 'Student Approved',
@@ -146,7 +139,7 @@ export default function TeacherHomeDashboard() {
 
                 recentDocs?.forEach(doc => {
                     const student = students?.find(s => s.id === doc.student_id);
-                    recentActivities.push({
+                    activities.push({
                         id: `doc-${doc.id}`,
                         type: 'document',
                         title: 'Document Uploaded',
@@ -157,40 +150,32 @@ export default function TeacherHomeDashboard() {
                 });
             }
 
-            // Sort by most recent
-            recentActivities.sort((a, b) => {
-                // Simple sort - newer items first
-                return 0;
-            });
+            return {
+                stats: {
+                    totalStudents,
+                    pendingApprovals,
+                    approvedStudents,
+                    totalDocuments,
+                    completedApplications: 0,
+                    upcomingDeadlines: deadlines.length
+                },
+                activities: activities.slice(0, 8),
+                deadlines
+            };
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes - instant on tab switch
+    });
 
-            setStats({
-                totalStudents,
-                pendingApprovals,
-                approvedStudents,
-                totalDocuments,
-                completedApplications: 0,
-                upcomingDeadlines: upcomingDeadlines.length
-            });
-            setActivities(recentActivities.slice(0, 8));
-            setDeadlines(upcomingDeadlines);
-        } catch (error) {
-            console.error("Error fetching dashboard data:", error);
-        } finally {
-            setIsLoading(false);
-        }
+    const stats = dashboardData?.stats || {
+        totalStudents: 0,
+        pendingApprovals: 0,
+        approvedStudents: 0,
+        totalDocuments: 0,
+        completedApplications: 0,
+        upcomingDeadlines: 0
     };
-
-    const formatTimeAgo = (date: Date): string => {
-        const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-        if (seconds < 60) return 'Just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
-    };
+    const activities = dashboardData?.activities || [];
+    const deadlines = dashboardData?.deadlines || [];
 
     const getActivityIcon = (type: string) => {
         switch (type) {
