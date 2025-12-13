@@ -24,12 +24,43 @@ const { spawn } = require('child_process');
 
 const PROTOCOL_SCHEME = 'uniconsulting';
 const isDev = process.env.ELECTRON_DEV === 'true';
+const APP_MODE = process.env.APP_MODE || 'teacher'; // 'student' or 'teacher'
+
+// Check if we have bundled frontend (offline mode)
+const hasBundledFrontend = require('fs').existsSync(path.join(__dirname, 'frontend', 'index.html'));
+
+// URLs for remote mode (fallback)
 const BASE_URL = isDev
     ? 'http://localhost:3000'
     : 'https://uniconsulting.netlify.app';
 
-const LOGIN_URL = `${BASE_URL}/login`;
-const DASHBOARD_URL = `${BASE_URL}/teacher/home`;
+// Determine start URL based on mode and bundled frontend
+function getStartUrl(isLoggedIn) {
+    if (hasBundledFrontend && !isDev) {
+        // Offline mode: load from local files
+        const basePath = path.join(__dirname, 'frontend');
+        if (isLoggedIn) {
+            return APP_MODE === 'student'
+                ? `file://${path.join(basePath, 'student', 'home', 'index.html')}`
+                : `file://${path.join(basePath, 'teacher', 'home', 'index.html')}`;
+        }
+        return `file://${path.join(basePath, 'login', 'index.html')}`;
+    }
+
+    // Online mode: load from remote URL
+    if (isLoggedIn) {
+        return APP_MODE === 'student'
+            ? `${BASE_URL}/student/home`
+            : `${BASE_URL}/teacher/home`;
+    }
+    return `${BASE_URL}/login`;
+}
+
+const log = function (message) {
+    console.log(`[Main] ${message}`);
+};
+
+log(`App Mode: ${APP_MODE}, Bundled Frontend: ${hasBundledFrontend}, Dev: ${isDev}`);
 
 // ============================================================================
 // Auto-Updater Setup
@@ -236,7 +267,7 @@ function createMainWindow() {
 
     // Check if user is already logged in
     const storedToken = store.get('authToken');
-    const startUrl = storedToken ? DASHBOARD_URL : LOGIN_URL;
+    const startUrl = getStartUrl(!!storedToken);
 
     log(`Loading: ${startUrl} (logged in: ${!!storedToken})`);
     mainWindow.loadURL(startUrl);
