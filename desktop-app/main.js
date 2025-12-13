@@ -1,11 +1,14 @@
 /**
- * Electron Main Process - Production-Ready Boilerplate
+ * Electron Main Process - Discord-Level UX
  * 
  * Features:
+ * - Splash screen with branded animation
+ * - Silent auto-update checking
+ * - Background main window loading
+ * - Seamless splash → main transition
  * - No default menu bar (clean window)
- * - Custom protocol deep linking (myapp://)
+ * - Custom protocol deep linking (uniconsulting://)
  * - Single instance lock
- * - Browser-based authentication flow
  * - Secure token storage
  * 
  * @file desktop-app/main.js
@@ -16,21 +19,32 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 // ============================================================================
-// CONFIGURATION - Customize these values
+// CONFIGURATION
 // ============================================================================
 
-// Custom protocol scheme (e.g., myapp://, uniconsulting://)
 const PROTOCOL_SCHEME = 'uniconsulting';
-
-// Your web app URLs
 const isDev = process.env.ELECTRON_DEV === 'true';
 const BASE_URL = isDev
     ? 'http://localhost:3000'
     : 'https://uniconsulting.netlify.app';
 
-// Different pages
 const LOGIN_URL = `${BASE_URL}/login`;
-const DASHBOARD_URL = `${BASE_URL}/student-dashboard`;
+const DASHBOARD_URL = `${BASE_URL}/teacher/home`;
+
+// ============================================================================
+// Auto-Updater Setup
+// ============================================================================
+
+let autoUpdater = null;
+try {
+    const { autoUpdater: updater } = require('electron-updater');
+    autoUpdater = updater;
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+    log('Auto-updater initialized');
+} catch (e) {
+    log('electron-updater not available, skipping auto-update');
+}
 
 // ============================================================================
 // Token Storage (using electron-store)
@@ -42,7 +56,7 @@ let store;
 try {
     Store = require('electron-store');
     store = new Store({
-        encryptionKey: 'uniconsulting-secure-key-2024', // Change this!
+        encryptionKey: 'uniconsulting-secure-key-2024',
         schema: {
             authToken: { type: 'string', default: '' },
             refreshToken: { type: 'string', default: '' },
@@ -50,8 +64,7 @@ try {
         }
     });
 } catch (e) {
-    console.log('[Main] electron-store not available, using in-memory storage');
-    // Fallback to in-memory storage if electron-store is not installed
+    log('electron-store not available, using in-memory storage');
     store = {
         _data: {},
         get: (key) => store._data[key] || '',
@@ -64,8 +77,11 @@ try {
 // Global References
 // ============================================================================
 
+let splashWindow = null;
 let mainWindow = null;
 let engineProcess = null;
+let isMainWindowReady = false;
+let updateAvailable = false;
 
 // ============================================================================
 // Logging
@@ -79,7 +95,6 @@ function log(message) {
 // Custom Protocol Registration
 // ============================================================================
 
-// Register the protocol scheme with Windows
 if (process.defaultApp) {
     if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
@@ -100,19 +115,13 @@ if (!gotTheLock) {
     log('Another instance is already running. Exiting...');
     app.quit();
 } else {
-    // Handle second instance (Windows/Linux)
     app.on('second-instance', (event, commandLine, workingDirectory) => {
         log('Second instance detected');
-
-        // Find the deep link URL in command line args
         const deepLinkUrl = commandLine.find(arg => arg.startsWith(`${PROTOCOL_SCHEME}://`));
-
         if (deepLinkUrl) {
             log(`Deep link received: ${deepLinkUrl}`);
             handleDeepLink(deepLinkUrl);
         }
-
-        // Focus the existing window
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
@@ -120,7 +129,6 @@ if (!gotTheLock) {
     });
 }
 
-// Handle open-url event (macOS)
 app.on('open-url', (event, url) => {
     event.preventDefault();
     log(`open-url received: ${url}`);
@@ -134,8 +142,6 @@ app.on('open-url', (event, url) => {
 function handleDeepLink(url) {
     try {
         const parsedUrl = new URL(url);
-
-        // Handle auth callback: uniconsulting://auth?token=XYZ
         if (parsedUrl.hostname === 'auth' || parsedUrl.pathname === '/auth') {
             const token = parsedUrl.searchParams.get('token');
             const refreshToken = parsedUrl.searchParams.get('refresh_token');
@@ -143,13 +149,10 @@ function handleDeepLink(url) {
 
             if (token) {
                 log('Auth token received from deep link');
-
-                // Store the tokens
                 store.set('authToken', token);
                 if (refreshToken) store.set('refreshToken', refreshToken);
                 if (email) store.set('userEmail', email);
 
-                // Notify the renderer
                 if (mainWindow) {
                     mainWindow.webContents.send('auth-success', { token, email });
                     mainWindow.focus();
@@ -162,11 +165,54 @@ function handleDeepLink(url) {
 }
 
 // ============================================================================
-// Window Creation
+// Splash Window (Discord-style)
 // ============================================================================
 
-function createWindow() {
-    // CRUCIAL: Remove the default menu bar
+function createSplashWindow() {
+    splashWindow = new BrowserWindow({
+        width: 400,
+        height: 300,
+        frame: false,
+        transparent: false,
+        resizable: false,
+        movable: false,
+        center: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        backgroundColor: '#0f172a',
+        show: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+
+    splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+
+    splashWindow.once('ready-to-show', () => {
+        splashWindow.show();
+        // Send app version to splash
+        splashWindow.webContents.send('app-version', app.getVersion());
+    });
+
+    splashWindow.on('closed', () => {
+        splashWindow = null;
+    });
+
+    return splashWindow;
+}
+
+function updateSplashStatus(status, showProgress = false, progress = 0) {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.webContents.send('splash-status', { status, showProgress, progress });
+    }
+}
+
+// ============================================================================
+// Main Window Creation
+// ============================================================================
+
+function createMainWindow() {
     Menu.setApplicationMenu(null);
 
     mainWindow = new BrowserWindow({
@@ -176,9 +222,8 @@ function createWindow() {
         minHeight: 700,
         title: 'UniConsulting',
         icon: path.join(__dirname, 'assets', 'icon.png'),
-        show: false,
+        show: false, // Hidden until ready
         backgroundColor: '#0f172a',
-        // Hide menu bar (alternative method)
         autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -193,13 +238,18 @@ function createWindow() {
     const storedToken = store.get('authToken');
     const startUrl = storedToken ? DASHBOARD_URL : LOGIN_URL;
 
-    // Load the appropriate page
     log(`Loading: ${startUrl} (logged in: ${!!storedToken})`);
     mainWindow.loadURL(startUrl);
 
-    // Show window when ready
+    // CRITICAL: When main window is ready, transition from splash
     mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
+        isMainWindowReady = true;
+        log('Main window ready');
+
+        // If no update is downloading, show main window immediately
+        if (!updateAvailable) {
+            transitionToMainWindow();
+        }
 
         // If we have a stored token, notify the renderer
         if (storedToken) {
@@ -211,12 +261,10 @@ function createWindow() {
         }
     });
 
-    // Open DevTools in development
     if (isDev) {
         mainWindow.webContents.openDevTools();
     }
 
-    // Handle external links
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url.includes('localhost') || url.includes('uniconsulting') || url.includes('supabase')) {
             return { action: 'allow' };
@@ -228,6 +276,83 @@ function createWindow() {
     mainWindow.on('closed', () => {
         mainWindow = null;
         killEngine();
+    });
+}
+
+function transitionToMainWindow() {
+    if (mainWindow && splashWindow) {
+        log('Transitioning from splash to main window');
+        mainWindow.show();
+
+        // Small delay for smooth visual transition
+        setTimeout(() => {
+            if (splashWindow && !splashWindow.isDestroyed()) {
+                splashWindow.close();
+            }
+        }, 200);
+    } else if (mainWindow) {
+        mainWindow.show();
+    }
+}
+
+// ============================================================================
+// Auto-Update Flow
+// ============================================================================
+
+function setupAutoUpdater() {
+    if (!autoUpdater) {
+        updateSplashStatus('Loading...');
+        createMainWindow();
+        return;
+    }
+
+    updateSplashStatus('Checking for updates...');
+
+    autoUpdater.on('checking-for-update', () => {
+        log('Checking for updates...');
+        updateSplashStatus('Checking for updates...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        log(`Update available: ${info.version}`);
+        updateAvailable = true;
+        updateSplashStatus('Downloading update...', true, 0);
+        autoUpdater.downloadUpdate();
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        log('No update available');
+        updateSplashStatus('Starting...');
+        createMainWindow();
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        const percent = Math.round(progress.percent);
+        log(`Download progress: ${percent}%`);
+        updateSplashStatus(`Downloading update... ${percent}%`, true, percent);
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+        log('Update downloaded, will install on restart');
+        updateSplashStatus('Installing update...');
+
+        // Install and restart
+        setTimeout(() => {
+            autoUpdater.quitAndInstall(false, true);
+        }, 1000);
+    });
+
+    autoUpdater.on('error', (error) => {
+        log(`Auto-updater error: ${error.message}`);
+        updateSplashStatus('Starting...');
+        createMainWindow();
+    });
+
+    // Start checking for updates
+    autoUpdater.checkForUpdates().catch((err) => {
+        log(`Update check failed: ${err.message}`);
+        updateSplashStatus('Starting...');
+        createMainWindow();
     });
 }
 
@@ -318,6 +443,8 @@ async function runEngine(studentData) {
 
 ipcMain.handle('is-desktop', () => true);
 
+ipcMain.handle('get-version', () => app.getVersion());
+
 ipcMain.handle('get-auth-token', () => ({
     token: store.get('authToken'),
     email: store.get('userEmail'),
@@ -329,7 +456,6 @@ ipcMain.handle('login-with-browser', () => {
     return { success: true };
 });
 
-// Save auth token from web app (called after successful login)
 ipcMain.handle('save-auth-token', (event, { token, refreshToken, email }) => {
     log(`Saving auth token for: ${email}`);
     store.set('authToken', token);
@@ -338,7 +464,6 @@ ipcMain.handle('save-auth-token', (event, { token, refreshToken, email }) => {
     return { success: true };
 });
 
-// Navigate to dashboard after login
 ipcMain.handle('navigate-to-dashboard', () => {
     log('Navigating to dashboard');
     if (mainWindow) {
@@ -369,16 +494,54 @@ ipcMain.handle('stop-agent', () => {
     return { success: true };
 });
 
+// Auto-updater IPC (for manual update checks)
+ipcMain.handle('check-for-updates', async () => {
+    if (!autoUpdater) return { available: false };
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return { available: !!result?.updateInfo };
+    } catch {
+        return { available: false };
+    }
+});
+
+ipcMain.handle('download-update', async () => {
+    if (!autoUpdater) return { success: false };
+    try {
+        await autoUpdater.downloadUpdate();
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('install-update', () => {
+    if (autoUpdater) {
+        autoUpdater.quitAndInstall(false, true);
+    }
+});
+
+ipcMain.handle('open-external', async (event, url) => {
+    await shell.openExternal(url);
+});
+
 // ============================================================================
-// App Lifecycle
+// App Lifecycle - Discord-Style Startup
 // ============================================================================
 
 app.whenReady().then(() => {
-    createWindow();
+    log('UniConsulting Desktop starting...');
+
+    // Step 1: Show splash screen immediately
+    createSplashWindow();
+
+    // Step 2: Start auto-update check (this will create main window when done)
+    setupAutoUpdater();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
+            createSplashWindow();
+            setupAutoUpdater();
         }
     });
 });
@@ -399,5 +562,3 @@ if (deepLinkArg) {
     log(`Deep link from startup: ${deepLinkArg}`);
     app.whenReady().then(() => handleDeepLink(deepLinkArg));
 }
-
-log('UniConsulting Desktop starting...');

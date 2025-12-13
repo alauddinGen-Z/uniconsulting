@@ -21,7 +21,8 @@
         "dist:linux": "electron-builder --linux"
     },
     "dependencies": {
-        "electron-store": "^8.1.0"
+        "electron-store": "^8.1.0",
+        "electron-updater": "^6.1.7"
     },
     "devDependencies": {
         "electron": "^28.1.0",
@@ -38,6 +39,7 @@
         "files": [
             "main.js",
             "preload.js",
+            "splash.html",
             "index.html"
         ],
         "extraResources": [

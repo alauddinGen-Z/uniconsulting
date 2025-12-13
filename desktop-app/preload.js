@@ -98,6 +98,62 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.on('engine-log', handler);
         return () => ipcRenderer.removeListener('engine-log', handler);
     },
+
+    // ============================================================================
+    // Auto-Updater API
+    // ============================================================================
+
+    /**
+     * Get app version
+     */
+    getVersion: () => ipcRenderer.invoke('get-version'),
+
+    /**
+     * Check for updates manually
+     */
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+
+    /**
+     * Download available update
+     */
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+
+    /**
+     * Install downloaded update and restart
+     */
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+
+    /**
+     * Listen for update available event
+     */
+    onUpdateAvailable: (callback) => {
+        const handler = (event, info) => callback(info);
+        ipcRenderer.on('update-available', handler);
+        return () => ipcRenderer.removeListener('update-available', handler);
+    },
+
+    /**
+     * Listen for download progress
+     */
+    onUpdateProgress: (callback) => {
+        const handler = (event, progress) => callback(progress);
+        ipcRenderer.on('download-progress', handler);
+        return () => ipcRenderer.removeListener('download-progress', handler);
+    },
+
+    /**
+     * Listen for update downloaded event
+     */
+    onUpdateDownloaded: (callback) => {
+        const handler = (event, info) => callback(info);
+        ipcRenderer.on('update-downloaded', handler);
+        return () => ipcRenderer.removeListener('update-downloaded', handler);
+    },
+
+    /**
+     * Open URL in external browser
+     */
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });
 
 console.log('[Preload] UniConsulting Desktop bridge initialized');
