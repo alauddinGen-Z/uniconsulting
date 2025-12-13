@@ -24,12 +24,13 @@ const PROTOCOL_SCHEME = 'uniconsulting';
 
 // Your web app URLs
 const isDev = process.env.ELECTRON_DEV === 'true';
-const WEB_APP_URL = isDev
+const BASE_URL = isDev
     ? 'http://localhost:3000'
     : 'https://uniconsulting.netlify.app';
 
-// Login page URL (where users will authenticate)
-const LOGIN_URL = `${WEB_APP_URL}/login?desktop=true`;
+// Different pages
+const LOGIN_URL = `${BASE_URL}/login`;
+const DASHBOARD_URL = `${BASE_URL}/student-dashboard`;
 
 // ============================================================================
 // Token Storage (using electron-store)
@@ -188,20 +189,23 @@ function createWindow() {
         },
     });
 
-    // Load the web app
-    log(`Loading: ${WEB_APP_URL}`);
-    mainWindow.loadURL(WEB_APP_URL);
+    // Check if user is already logged in
+    const storedToken = store.get('authToken');
+    const startUrl = storedToken ? DASHBOARD_URL : LOGIN_URL;
+
+    // Load the appropriate page
+    log(`Loading: ${startUrl} (logged in: ${!!storedToken})`);
+    mainWindow.loadURL(startUrl);
 
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
 
-        // Check if we have a stored token
-        const token = store.get('authToken');
-        if (token) {
-            log('Found stored auth token');
+        // If we have a stored token, notify the renderer
+        if (storedToken) {
+            log('Restoring stored auth session');
             mainWindow.webContents.send('auth-restored', {
-                token,
+                token: storedToken,
                 email: store.get('userEmail')
             });
         }
@@ -322,6 +326,24 @@ ipcMain.handle('get-auth-token', () => ({
 ipcMain.handle('login-with-browser', () => {
     log(`Opening login URL: ${LOGIN_URL}`);
     shell.openExternal(LOGIN_URL);
+    return { success: true };
+});
+
+// Save auth token from web app (called after successful login)
+ipcMain.handle('save-auth-token', (event, { token, refreshToken, email }) => {
+    log(`Saving auth token for: ${email}`);
+    store.set('authToken', token);
+    if (refreshToken) store.set('refreshToken', refreshToken);
+    if (email) store.set('userEmail', email);
+    return { success: true };
+});
+
+// Navigate to dashboard after login
+ipcMain.handle('navigate-to-dashboard', () => {
+    log('Navigating to dashboard');
+    if (mainWindow) {
+        mainWindow.loadURL(DASHBOARD_URL);
+    }
     return { success: true };
 });
 

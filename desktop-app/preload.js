@@ -39,6 +39,18 @@ contextBridge.exposeInMainWorld('electron', {
     logout: () => ipcRenderer.invoke('logout'),
 
     /**
+     * Save auth token for persistent login
+     * Call this after successful web login
+     * @param {Object} data - { token, refreshToken, email }
+     */
+    saveAuthToken: (data) => ipcRenderer.invoke('save-auth-token', data),
+
+    /**
+     * Navigate to dashboard after login
+     */
+    navigateToDashboard: () => ipcRenderer.invoke('navigate-to-dashboard'),
+
+    /**
      * Listen for successful authentication from deep link
      * @param {Function} callback - Called with {token, email}
      * @returns {Function} Cleanup function
