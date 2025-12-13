@@ -8,29 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-
-// Type definitions for the electron API
-interface ElectronAPI {
-    isDesktop: boolean;
-    runAgent: (student: any, universityUrl?: string) => Promise<{ success: boolean; error?: string; result?: string }>;
-    stopAgent: () => Promise<{ success: boolean; error?: string }>;
-    onAgentLog: (callback: (data: { type: 'stdout' | 'stderr'; message: string }) => void) => () => void;
-    getVersion: () => Promise<string>;
-    // Auto-updater
-    onUpdateAvailable: (callback: (info: any) => void) => () => void;
-    onUpdateProgress: (callback: (progress: any) => void) => () => void;
-    onUpdateDownloaded: (callback: (info: any) => void) => () => void;
-    downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
-    installUpdate: () => void;
-    openExternal: (url: string) => Promise<void>;
-}
-
-// Extend Window interface
-declare global {
-    interface Window {
-        electron?: ElectronAPI;
-    }
-}
+import type { ElectronAPI } from '@/types/global';
 
 export interface AgentLog {
     type: 'stdout' | 'stderr';
