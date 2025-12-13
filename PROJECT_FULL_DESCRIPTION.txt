@@ -1,197 +1,101 @@
-# UniConsulting - Complete Project Description
+# UniConsulting - MVP Product Description
 
-## Project Type: MVP (Minimum Viable Product) for University Consulting CRM
-
-## Purpose
-UniConsulting is a **SaaS platform for university application consultants** (agents who help international students apply to universities abroad). It connects:
-- **Students** - Who need help with applications
-- **Consultants/Teachers** - Who manage student cases
+## Executive Summary
+UniConsulting is a **SaaS CRM platform** that helps university consulting agencies manage international student applications efficiently through AI-powered automation.
 
 ---
 
-## Tech Stack
+## Problem Statement
+International students seeking admission to foreign universities face:
+- Complex document requirements (transcripts, test scores, passports)
+- Multiple essay drafts with no structured feedback
+- Scattered communication with consultants
+- Manual, error-prone data entry
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 16 (App Router), React 19, TypeScript |
-| Styling | Tailwind CSS v4 with CSS Variables |
-| Backend | Supabase (PostgreSQL + Auth + Realtime + Storage + Edge Functions) |
-| AI | Google Gemini 2.0 Flash (OCR, Essay Review, University Matching) |
-| Hosting | Netlify (frontend), Supabase (backend) |
-
----
-
-## Architecture
-
-```
-/src
-├── /app                    # Next.js App Router
-│   ├── /api               # API routes (AI features)
-│   ├── /login             # Auth page
-│   ├── /student/dashboard # Student portal
-│   └── /teacher/dashboard # Teacher portal
-├── /components
-│   ├── /chat              # Chat system (StudentChat, ChatView)
-│   ├── /shared            # Reusable (SettingsModal, ProfileModal)
-│   ├── /student           # Student-only components
-│   └── /teacher           # Teacher-only components
-├── /lib
-│   ├── i18n.tsx           # Multilingual (EN/RU/KG)
-│   ├── theme-config.ts    # Brand theming
-│   ├── ai-cache.ts        # AI response caching
-│   └── gemini-client.ts   # Robust Gemini wrapper
-└── /hooks                 # Custom React hooks
-```
+Consultants struggle with:
+- Managing 50+ students across different application stages
+- Repetitive document verification tasks
+- Inconsistent communication tracking
 
 ---
 
-## Core Features
+## Solution: UniConsulting MVP
 
-### 1. Authentication & Roles
-- **Email/Password login** via Supabase Auth
-- **Two roles**: `student` and `teacher`
-- Students must be **approved** by a teacher before accessing features
-
-### 2. Student Dashboard
-Students can:
-- **Upload documents** (Passport, Transcripts, IELTS, SAT, TOEFL)
-- **AI Document OCR**: Auto-extract scores from uploaded documents
-- **Write essays** with version history
-- **AI Essay Review**: Get AI feedback on essays
-- **Chat 1:1** with assigned consultant
-- **Track university list** and application status
-
-### 3. Teacher Dashboard
-Teachers can:
-- **View Kanban board** of students by stage
-- **Approve pending students**
-- **View student profiles** and documents
-- **AI University Matcher**: Find best-fit universities for students
-- **Chat with students**
-- **Admin panel** (for admin teachers)
-
-### 4. AI-Powered Features
-| Feature | Endpoint | Description |
-|---------|----------|-------------|
-| Document OCR | `/api/document-ocr` + Edge Function | Extracts scores from IELTS/SAT/GPA/Passport images |
-| Essay Review | `/api/ai-review` | AI grades essays on grammar, clarity, structure |
-| University Matcher | `/api/university-matcher` | Recommends universities based on student profile |
-
-All AI calls have:
-- **Caching** (7-30 days) to reduce costs
-- **Retry logic** (3 retries with exponential backoff)
-
-### 5. Multilingual Support
-- Languages: English (EN), Russian (RU), Kyrgyz (KG)
-- Stored in `localStorage` as `uni_language`
-- Uses static dictionaries (no API translation)
-
-### 6. Dynamic Theming
-- Brand presets: `UNICONSULTING_THEME` (orange), `GLOBAL_COMPASS_THEME` (blue)
-- CSS variables for easy white-labeling
-- Configured in `src/lib/theme-config.ts`
+### Core Value Proposition
+**"AI-powered university application management that reduces consultant workload by 60% while improving student experience."**
 
 ---
 
-## Database Schema (Supabase/PostgreSQL)
+## MVP Features
 
-### Key Tables
-| Table | Purpose |
-|-------|---------|
-| `profiles` | User profiles (name, role, teacher_id, scores, etc.) |
-| `essays` | Student essays with AI review results |
-| `essay_versions` | Version history for essays |
-| `documents` | Uploaded document metadata |
-| `student_universities` | Universities student is applying to |
-| `conversations` | Chat conversations |
-| `messages` | Chat messages |
-| `conversation_participants` | Who is in each conversation |
-| `ai_query_cache` | Cached AI responses |
+### For Students
+| Feature | Description |
+|---------|-------------|
+| **Document Upload + AI OCR** | Upload passport, transcripts, IELTS, SAT - AI extracts scores automatically |
+| **Essay Writing + AI Review** | Write essays, get instant AI feedback on grammar, clarity, structure |
+| **1:1 Consultant Chat** | Direct messaging with assigned consultant |
+| **Application Tracker** | View university list and application status |
 
-### RLS (Row Level Security)
-- All tables have RLS enabled
-- Students can only see their own data
-- Teachers can see data of students assigned to them
+### For Consultants (Teachers)
+| Feature | Description |
+|---------|-------------|
+| **Kanban Dashboard** | Visual pipeline of students by stage (Lead → Applied → Accepted) |
+| **AI University Matcher** | Input student's GPA/scores → Get recommended universities |
+| **Student Management** | Approve registrations, view documents, track progress |
+| **Real-time Chat** | Respond to student queries with instant messaging |
 
 ---
 
-## Environment Variables
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
-
-# Google AI
-GEMINI_API_KEY=xxx
-
-# Optional
-NEXT_PUBLIC_GOOGLE_MAPS_KEY=xxx
-```
+## Technology Highlights
+- **AI-Powered**: Google Gemini 2.0 for document OCR, essay review, university matching
+- **Real-time**: Live chat and instant updates via Supabase Realtime
+- **Multilingual**: English, Russian, Kyrgyz support built-in
+- **White-label Ready**: Customizable branding (colors, logo, name)
 
 ---
 
-## Key User Flows
-
-### Student Registration Flow
-1. Student signs up with email
-2. Account is `pending` (is_approved = false)
-3. Teacher approves student → creates chat conversation
-4. Student can now access full dashboard
-
-### Document Upload Flow
-1. Student uploads document image
-2. Frontend sends to `/api/document-ocr` (or Edge Function)
-3. Gemini Vision extracts text/scores
-4. Scores are saved to student profile
-5. Original document stored in Supabase Storage
-
-### Essay Review Flow
-1. Student writes/pastes essay
-2. Clicks "Get AI Feedback"
-3. Frontend calls `/api/ai-review`
-4. Response cached for 7 days
-5. Student sees grammar/clarity/structure scores
+## Target Users
+1. **Primary**: Small-to-medium university consulting agencies (5-50 consultants)
+2. **Secondary**: Independent education consultants
+3. **End Users**: International students (primarily from CIS countries)
 
 ---
 
-## File Structure Highlights
-
-| File | Purpose |
-|------|---------|
-| `src/app/layout.tsx` | Root layout with LanguageProvider, theme class |
-| `src/components/student/DashboardSidebar.tsx` | Student navigation |
-| `src/components/teacher/TeacherSidebar.tsx` | Teacher navigation |
-| `src/components/chat/StudentChat.tsx` | 1:1 chat with assigned teacher |
-| `src/lib/i18n.tsx` | Translation dictionary and hooks |
-| `src/lib/theme-config.ts` | Brand color presets |
-| `supabase/functions/document-ocr/index.ts` | Edge Function for OCR |
+## MVP Metrics (Success Criteria)
+| Metric | Target |
+|--------|--------|
+| Document processing time | < 30 seconds (vs 5+ minutes manual) |
+| Student onboarding | < 10 minutes |
+| Consultant efficiency | Manage 30% more students |
+| User satisfaction | NPS > 40 |
 
 ---
 
-## Current Status: Production MVP
+## Current Status: Production-Ready MVP ✅
 
-- ✅ Authentication working
-- ✅ Student/Teacher dashboards
-- ✅ Document upload + AI OCR
-- ✅ Essay writing + AI review
-- ✅ University matcher AI
-- ✅ Real-time chat
-- ✅ Multilingual (EN/RU/KG)
-- ✅ Dynamic theming
-- ✅ Deployed to Netlify + Supabase
+### What's Built
+- ✅ Student & Teacher authentication
+- ✅ Document upload with AI extraction
+- ✅ Essay writing with AI review
+- ✅ AI University Matcher
+- ✅ Real-time 1:1 chat
+- ✅ Kanban pipeline view
+- ✅ Multilingual UI (EN/RU/KG)
 
----
-
-## Known Limitations (MVP Scope)
-
-- No payment processing
-- No email notifications
-- Teacher presence (online status) is simulated
-- No mobile app (responsive web only)
-- Single tenant (no multi-company support yet)
+### What's Next (Post-MVP)
+- 🔄 Email notifications
+- 🔄 Payment integration
+- 🔄 Mobile app
+- 🔄 Multi-tenant (agency white-labeling)
+- 🔄 Analytics dashboard
 
 ---
 
-*Last Updated: 2025-12-13*
+## Deployment
+- **Frontend**: Netlify (https://uniconsulting.netlify.app)
+- **Backend**: Supabase Cloud
+- **AI**: Google Gemini API
+
+---
+
+*Version: MVP 1.0 | Last Updated: 2025-12-13*
