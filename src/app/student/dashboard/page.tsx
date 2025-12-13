@@ -5,7 +5,7 @@ import HomeDashboard from "@/components/student/HomeDashboard";
 import ProfilePage from "@/components/student/ProfilePage";
 import ApplicationPage from "@/components/student/ApplicationPage";
 import DocumentsTabPage from "@/components/student/DocumentsTabPage";
-import WhatsAppChat from "@/components/chat/WhatsAppChat";
+import StudentChat from "@/components/chat/StudentChat";
 import DashboardSidebar from "@/components/student/DashboardSidebar";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { StudentDataProvider } from "@/contexts/StudentDataContext";
@@ -124,8 +124,8 @@ export default function StudentDashboard() {
                             {activeTab === "application" && <ApplicationPage isLocked={isLocked} />}
                             {activeTab === "documents" && <DocumentsTabPage isLocked={isLocked} />}
                             {activeTab === "messages" && (
-                                <div className="h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] -mx-4 lg:-mx-8 -mb-6 lg:-mb-8">
-                                    <WhatsAppChat userRole="student" />
+                                <div className="h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] -mx-4 lg:-mx-8 -mb-6 lg:-mb-8 p-4">
+                                    <StudentChat />
                                 </div>
                             )}
                         </div>

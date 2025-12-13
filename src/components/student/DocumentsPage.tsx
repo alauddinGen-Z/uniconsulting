@@ -190,22 +190,6 @@ export default function DocumentsPage({ isLocked }: { isLocked?: boolean }) {
                                 // Dispatch custom event so tabs can refresh
                                 window.dispatchEvent(new CustomEvent('scores-updated'));
                                 window.dispatchEvent(new CustomEvent('profile-updated'));
-
-                                // ============================================
-                                // PRIVACY SHIELD: PII Data Privacy Compliance
-                                // Auto-delete passport images from storage after
-                                // successful OCR extraction. We keep the DB record
-                                // but remove the actual file containing PII.
-                                // ============================================
-                                if (categoryId.toLowerCase() === 'passport') {
-                                    try {
-                                        await supabase.storage.from('documents').remove([fileName]);
-                                        console.log("[Privacy Shield] Passport file deleted from storage after OCR");
-                                        toast.success("🛡️ Passport securely processed and deleted", { duration: 3000 });
-                                    } catch (deleteError) {
-                                        console.error("[Privacy Shield] Failed to delete passport file:", deleteError);
-                                    }
-                                }
                             } else {
                                 console.error("Error updating profile:", updateError);
                                 toast.error("Extracted but failed to save: " + (updateError.message || JSON.stringify(updateError)), { id: "ai-extract" });
