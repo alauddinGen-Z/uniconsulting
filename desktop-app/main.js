@@ -1,10 +1,10 @@
 /**
- * Electron Main Process
+ * Electron Main Process - Thin Client Architecture
  * 
- * Standalone desktop app that loads the Next.js static export locally
- * and provides Python automation via IPC.
+ * Loads the remote Netlify web app and provides a secure bridge
+ * to the local Python automation engine.
  * 
- * Architecture: Discord-style (bundled frontend + sidecar process)
+ * Architecture: Discord-style (remote URL + local sidecar)
  * 
  * @file desktop-app/main.js
  */
@@ -12,53 +12,14 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const { autoUpdater } = require('electron-updater');
 const isDev = process.env.ELECTRON_DEV === 'true';
 
-// Keep a global reference to prevent garbage collection
+// Remote app URL - loads from Netlify (always latest version)
+const APP_URL = process.env.APP_URL || 'https://uniconsulting.netlify.app';
+
+// Keep global references
 let mainWindow = null;
-let agentProcess = null;
-
-// ============================================================================
-// Auto-Updater Configuration
-// ============================================================================
-
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
-
-autoUpdater.on('checking-for-update', () => {
-    log('Checking for updates...');
-});
-
-autoUpdater.on('update-available', (info) => {
-    log(`Update available: ${info.version}`);
-    // Notify renderer about available update
-    if (mainWindow) {
-        mainWindow.webContents.send('update-available', info);
-    }
-});
-
-autoUpdater.on('update-not-available', () => {
-    log('App is up to date');
-});
-
-autoUpdater.on('download-progress', (progress) => {
-    log(`Download progress: ${Math.round(progress.percent)}%`);
-    if (mainWindow) {
-        mainWindow.webContents.send('update-progress', progress);
-    }
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-    log('Update downloaded, will install on quit');
-    if (mainWindow) {
-        mainWindow.webContents.send('update-downloaded', info);
-    }
-});
-
-autoUpdater.on('error', (error) => {
-    log(`Auto-updater error: ${error.message}`);
-});
+let engineProcess = null;
 
 // ============================================================================
 // Logging
@@ -72,16 +33,6 @@ function log(message) {
 // Window Management
 // ============================================================================
 
-function getAppPath() {
-    if (isDev) {
-        // In development, load from the parent's out folder (after next build)
-        return path.join(__dirname, '..', 'out', 'index.html');
-    } else {
-        // In production, load from extraResources
-        return path.join(process.resourcesPath, 'app', 'index.html');
-    }
-}
-
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -91,37 +42,26 @@ function createWindow() {
         title: 'UniConsulting',
         icon: path.join(__dirname, 'assets', 'icon.png'),
         show: false,
-        backgroundColor: '#0f172a', // Match app's dark theme
+        backgroundColor: '#0f172a',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-            sandbox: true,
-            webSecurity: !isDev, // Disable in dev for local file loading
+            // CRUCIAL SECURITY SETTINGS
+            contextIsolation: true,      // Required for security
+            nodeIntegration: false,      // Never allow for remote URLs
+            sandbox: true,               // Extra isolation
+            webSecurity: true,           // Enforce same-origin policy
+            allowRunningInsecureContent: false,
         },
     });
 
-    // Load the app
-    const appPath = getAppPath();
-    log(`Loading app from: ${appPath}`);
-
-    mainWindow.loadFile(appPath).catch((error) => {
-        log(`Failed to load app: ${error.message}`);
-        // Fallback to remote URL if local file fails
-        log('Falling back to remote URL...');
-        mainWindow.loadURL('https://uniconsulting.netlify.app');
-    });
+    // Load the remote Netlify app
+    log(`Loading remote app: ${APP_URL}`);
+    mainWindow.loadURL(APP_URL);
 
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-
-        // Check for updates after window is shown (not in dev mode)
-        if (!isDev) {
-            autoUpdater.checkForUpdates().catch((error) => {
-                log(`Update check failed: ${error.message}`);
-            });
-        }
+        log('Window ready');
     });
 
     // Open DevTools in development
@@ -129,8 +69,13 @@ function createWindow() {
         mainWindow.webContents.openDevTools();
     }
 
-    // Handle external links
+    // Handle external links - open in default browser
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        // Allow navigation within our app
+        if (url.includes('uniconsulting') || url.includes('supabase')) {
+            return { action: 'allow' };
+        }
+        // Open external links in default browser
         shell.openExternal(url);
         return { action: 'deny' };
     });
@@ -138,157 +83,136 @@ function createWindow() {
     // Handle window closed
     mainWindow.on('closed', () => {
         mainWindow = null;
-        killAgent();
+        killEngine();
     });
 }
 
 // ============================================================================
-// Python Agent Management
+// Python Engine Management
 // ============================================================================
 
-function getAgentPath() {
+function getEnginePath() {
     if (isDev) {
+        // Development: run Python script directly
         return {
             command: 'python',
-            args: [path.join(__dirname, 'python', 'agent.py')],
+            args: [path.join(__dirname, 'python', 'engine.py')],
         };
     } else {
-        const agentExe = process.platform === 'win32' ? 'agent.exe' : 'agent';
+        // Production: run bundled executable
+        const engineExe = process.platform === 'win32' ? 'engine.exe' : 'engine';
         return {
-            command: path.join(process.resourcesPath, 'agent', agentExe),
+            command: path.join(process.resourcesPath, 'engine', engineExe),
             args: [],
         };
     }
 }
 
-function killAgent() {
-    if (agentProcess) {
-        agentProcess.kill();
-        agentProcess = null;
-        log('Agent process killed');
+function killEngine() {
+    if (engineProcess) {
+        engineProcess.kill();
+        engineProcess = null;
+        log('Engine process killed');
     }
 }
 
-async function runAgent(studentProfile, universityUrl) {
+async function runEngine(studentData) {
     return new Promise((resolve, reject) => {
-        if (agentProcess) {
-            reject(new Error('Agent is already running'));
+        if (engineProcess) {
+            reject(new Error('Engine is already running'));
             return;
         }
 
-        const { command, args } = getAgentPath();
-        log(`Starting agent: ${command}`);
+        const { command, args } = getEnginePath();
+        log(`Starting engine: ${command}`);
 
-        agentProcess = spawn(command, args, {
+        engineProcess = spawn(command, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: {
                 ...process.env,
+                // Pass API key to Python process
                 GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '',
             },
         });
 
-        // Send input data
-        const inputData = JSON.stringify({
-            student: studentProfile,
-            url: universityUrl
-        });
-        agentProcess.stdin.write(inputData);
-        agentProcess.stdin.end();
+        // Send student data via stdin
+        engineProcess.stdin.write(JSON.stringify(studentData));
+        engineProcess.stdin.end();
 
         let output = '';
         let errorOutput = '';
 
-        agentProcess.stdout.on('data', (data) => {
-            const message = data.toString();
-            output += message;
-            log(`[Agent] ${message.trim()}`);
+        // Stream stdout to renderer
+        engineProcess.stdout.on('data', (data) => {
+            const message = data.toString().trim();
+            output += message + '\n';
+            log(`[Engine] ${message}`);
 
             if (mainWindow) {
-                mainWindow.webContents.send('agent-log', {
+                mainWindow.webContents.send('engine-log', {
                     type: 'stdout',
-                    message: message.trim()
+                    message
                 });
             }
         });
 
-        agentProcess.stderr.on('data', (data) => {
-            const message = data.toString();
-            errorOutput += message;
-            log(`[Agent Error] ${message.trim()}`);
+        // Stream stderr to renderer
+        engineProcess.stderr.on('data', (data) => {
+            const message = data.toString().trim();
+            errorOutput += message + '\n';
+            log(`[Engine Error] ${message}`);
 
             if (mainWindow) {
-                mainWindow.webContents.send('agent-log', {
+                mainWindow.webContents.send('engine-log', {
                     type: 'stderr',
-                    message: message.trim()
+                    message
                 });
             }
         });
 
-        agentProcess.on('close', (code) => {
-            log(`Agent exited with code: ${code}`);
-            agentProcess = null;
+        // Handle process exit
+        engineProcess.on('close', (code) => {
+            log(`Engine exited with code: ${code}`);
+            engineProcess = null;
 
             if (code === 0) {
                 resolve({ success: true, output });
             } else {
-                reject(new Error(`Agent failed with code ${code}: ${errorOutput}`));
+                reject(new Error(`Engine failed with code ${code}`));
             }
         });
 
-        agentProcess.on('error', (error) => {
-            log(`Agent spawn error: ${error.message}`);
-            agentProcess = null;
+        engineProcess.on('error', (error) => {
+            log(`Engine spawn error: ${error.message}`);
+            engineProcess = null;
             reject(error);
         });
     });
 }
 
 // ============================================================================
-// IPC Handlers
+// IPC Handlers - Restricted API for website
 // ============================================================================
 
 // Check if running in desktop app
 ipcMain.handle('is-desktop', () => true);
 
-// Get app version
-ipcMain.handle('get-version', () => app.getVersion());
-
-// Run automation agent
-ipcMain.handle('run-agent', async (event, { student, universityUrl }) => {
+// Run the automation engine (ONLY exposed function for automation)
+ipcMain.handle('run-agent', async (event, studentData) => {
     try {
-        log(`Running agent for student: ${student?.full_name}`);
-        const result = await runAgent(student, universityUrl);
+        log(`Running engine for: ${studentData?.full_name || 'Unknown'}`);
+        const result = await runEngine(studentData);
         return { success: true, ...result };
     } catch (error) {
-        log(`Agent error: ${error.message}`);
+        log(`Engine error: ${error.message}`);
         return { success: false, error: error.message };
     }
 });
 
-// Stop running agent
+// Stop running engine
 ipcMain.handle('stop-agent', () => {
-    killAgent();
+    killEngine();
     return { success: true };
-});
-
-// Download and install update
-ipcMain.handle('download-update', async () => {
-    try {
-        await autoUpdater.downloadUpdate();
-        return { success: true };
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-});
-
-// Install update and restart
-ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall();
-});
-
-// Open external URL
-ipcMain.handle('open-external', (event, url) => {
-    shell.openExternal(url);
 });
 
 // ============================================================================
@@ -312,21 +236,21 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-    killAgent();
+    killEngine();
 });
 
-// Security: Prevent new window creation
+// Security: Restrict navigation
 app.on('web-contents-created', (event, contents) => {
-    contents.on('will-navigate', (event, navigationUrl) => {
-        const parsedUrl = new URL(navigationUrl);
-        if (parsedUrl.protocol !== 'file:') {
-            // Allow navigation to our web app
-            if (!navigationUrl.includes('uniconsulting')) {
-                event.preventDefault();
-                shell.openExternal(navigationUrl);
-            }
+    // Prevent navigation to untrusted URLs
+    contents.on('will-navigate', (event, url) => {
+        const allowed = ['uniconsulting', 'supabase', 'netlify'];
+        const isAllowed = allowed.some(domain => url.includes(domain));
+
+        if (!isAllowed && !url.startsWith('file:')) {
+            log(`Blocked navigation to: ${url}`);
+            event.preventDefault();
         }
     });
 });
 
-log('UniConsulting Desktop starting...');
+log('UniConsulting Desktop (Thin Client) starting...');

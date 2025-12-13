@@ -1,10 +1,10 @@
 /**
- * Python Agent Build Script
+ * Python Engine Build Script
  * 
- * Uses PyInstaller to compile agent.py into a standalone executable.
+ * Uses PyInstaller to compile engine.py into a standalone executable.
  * The resulting executable is bundled with the Electron app.
  * 
- * @file desktop-app/build-agent.js
+ * @file desktop-app/build-engine.js
  */
 
 const { spawn } = require('child_process');
@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 
 const PYTHON_DIR = path.join(__dirname, 'python');
-const AGENT_SCRIPT = path.join(PYTHON_DIR, 'agent.py');
+const ENGINE_SCRIPT = path.join(PYTHON_DIR, 'engine.py');
 
 function log(message) {
     console.log(`[Build] ${message}`);
@@ -42,12 +42,12 @@ function runCommand(command, args, cwd) {
 
 async function main() {
     log('='.repeat(60));
-    log('UniConsulting Agent Build Script');
+    log('UniConsulting Engine Build Script');
     log('='.repeat(60));
 
-    // Check if agent.py exists
-    if (!fs.existsSync(AGENT_SCRIPT)) {
-        log(`Error: ${AGENT_SCRIPT} not found`);
+    // Check if engine.py exists
+    if (!fs.existsSync(ENGINE_SCRIPT)) {
+        log(`Error: ${ENGINE_SCRIPT} not found`);
         process.exit(1);
     }
 
@@ -87,7 +87,7 @@ async function main() {
     try {
         await runCommand('pyinstaller', [
             '--onedir',
-            '--name=agent',
+            '--name=engine',
             '--distpath=dist',
             '--workpath=build',
             '--specpath=build',
@@ -99,7 +99,7 @@ async function main() {
             '--collect-all=playwright',
             '--hidden-import=playwright.sync_api',
             '--hidden-import=playwright.async_api',
-            'agent.py',
+            'engine.py',
         ], PYTHON_DIR);
     } catch (error) {
         log(`Error: PyInstaller build failed - ${error.message}`);
@@ -109,7 +109,7 @@ async function main() {
     log('');
     log('='.repeat(60));
     log('Build Complete!');
-    log(`Executable: ${path.join(PYTHON_DIR, 'dist', 'agent')}`);
+    log(`Executable: ${path.join(PYTHON_DIR, 'dist', 'engine')}`);
     log('='.repeat(60));
 }
 

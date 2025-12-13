@@ -1,12 +1,12 @@
 """
-UniConsulting Automation Agent
+UniConsulting Automation Engine
 
 Uses browser-use library to automate university application form filling.
 Receives student data via stdin (JSON) and launches browser automation.
 
 Repository: https://github.com/browser-use/browser-use
 
-@file desktop-app/python/agent.py
+@file desktop-app/python/engine.py
 """
 
 import sys
@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='[Agent] %(message)s',
+    format='[Engine] %(message)s',
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def log(message: str):
     """Print a log message with flush for real-time streaming."""
-    print(f"[Agent] {message}", flush=True)
+    print(f"[Engine] {message}", flush=True)
 
 
 try:
