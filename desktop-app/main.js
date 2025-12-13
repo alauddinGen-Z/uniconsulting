@@ -14,8 +14,12 @@ const path = require('path');
 const { spawn } = require('child_process');
 const isDev = process.env.ELECTRON_DEV === 'true';
 
-// Remote app URL - loads from Netlify (always latest version)
-const APP_URL = process.env.APP_URL || 'https://uniconsulting.netlify.app';
+// Remote app URL
+// Development: localhost for instant testing
+// Production: Netlify (always latest version)
+const APP_URL = isDev
+    ? 'http://localhost:3000'
+    : (process.env.APP_URL || 'https://uniconsulting.netlify.app');
 
 // Keep global references
 let mainWindow = null;
@@ -243,7 +247,7 @@ app.on('before-quit', () => {
 app.on('web-contents-created', (event, contents) => {
     // Prevent navigation to untrusted URLs
     contents.on('will-navigate', (event, url) => {
-        const allowed = ['uniconsulting', 'supabase', 'netlify'];
+        const allowed = ['uniconsulting', 'supabase', 'netlify', 'localhost'];
         const isAllowed = allowed.some(domain => url.includes(domain));
 
         if (!isAllowed && !url.startsWith('file:')) {
