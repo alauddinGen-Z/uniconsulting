@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { User, LogOut, Settings, FolderOpen, Home, GraduationCap, MessageCircle, Sparkles, X, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
 import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
+import { usePrefetch } from "@/hooks/usePrefetch";
 import { ACTIVE_THEME } from "@/lib/theme-config";
 import { useLanguage } from "@/lib/i18n";
 
@@ -27,6 +29,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
     const router = useRouter();
     const supabase = createClient();
     const { unreadCount } = useUnreadMessageCount();
+    const { prefetchForStudentRoute } = usePrefetch();
     const { t } = useLanguage();
 
     useEffect(() => {
@@ -117,9 +120,12 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                 <nav className="flex-1 px-4 py-4 space-y-2">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">{t("nav.menu")}</div>
                     {navItems.map((item) => (
-                        <button
+                        <Link
                             key={item.id}
-                            onClick={() => handleNavClick(item.id)}
+                            href={`/student/${item.id}`}
+                            prefetch={true}
+                            onClick={onMobileClose}
+                            onMouseEnter={() => prefetchForStudentRoute(item.id)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
                                 ? "bg-brand-primary-500 text-white shadow-lg shadow-brand font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
@@ -143,7 +149,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                                     <Sparkles className="w-2 h-2" /> AI
                                 </span>
                             )}
-                        </button>
+                        </Link>
                     ))}
                 </nav>
 

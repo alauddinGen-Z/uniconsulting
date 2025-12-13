@@ -102,9 +102,9 @@ export default function LoginPage() {
                     toast.success(`Welcome, ${userRole}!`);
 
                     if (userRole === 'teacher') {
-                        router.push("/teacher/dashboard");
+                        router.push("/teacher/home");
                     } else {
-                        router.push("/student/dashboard");
+                        router.push("/student/home");
                     }
                 } else {
                     // Email confirmation required
@@ -170,9 +170,9 @@ export default function LoginPage() {
                 }
 
                 if (userRole === 'teacher') {
-                    router.push("/teacher/dashboard");
+                    router.push("/teacher/home");
                 } else {
-                    router.push("/student/dashboard");
+                    router.push("/student/home");
                 }
             }
         } catch (error: any) {

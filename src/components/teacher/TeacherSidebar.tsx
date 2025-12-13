@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
 import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
+import { usePrefetch } from "@/hooks/usePrefetch";
 import { ACTIVE_THEME } from "@/lib/theme-config";
 import { useLanguage } from "@/lib/i18n";
 
@@ -27,6 +29,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
     const router = useRouter();
     const supabase = createClient();
     const { unreadCount } = useUnreadMessageCount();
+    const { prefetchForTeacherRoute } = usePrefetch();
     const { t } = useLanguage();
 
     useEffect(() => {
@@ -66,7 +69,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
     };
 
     const navItems = [
-        { id: 'dashboard', label: t('nav.command_center'), icon: LayoutGrid },
+        { id: 'home', label: t('nav.command_center'), icon: LayoutGrid },
         { id: 'students', label: t('nav.students'), icon: Users },
         { id: 'ai-matcher', label: t('nav.ai_matcher'), icon: Sparkles, hasAI: true },
         { id: 'messages', label: t('nav.messages'), icon: MessageCircle },
@@ -109,9 +112,12 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                 <nav className="flex-1 px-4 space-y-2 py-4">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">{t("nav.menu")}</div>
                     {navItems.map((item) => (
-                        <button
+                        <Link
                             key={item.id}
-                            onClick={() => handleNavClick(item.id)}
+                            href={`/teacher/${item.id}`}
+                            prefetch={true}
+                            onClick={onMobileClose}
+                            onMouseEnter={() => prefetchForTeacherRoute(item.id)}
                             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
                                 ? "bg-brand-primary-600 text-white shadow-lg shadow-brand font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
@@ -146,7 +152,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                                     exit={{ opacity: 0 }}
                                 />
                             )}
-                        </button>
+                        </Link>
                     ))}
                 </nav>
 
