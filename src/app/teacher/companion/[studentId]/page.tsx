@@ -1,10 +1,18 @@
+"use client";
+
 import CompanionWindowDynamic from "@/components/teacher/automation/CompanionWindowDynamic";
+import { useParams } from "next/navigation";
 
-interface Props {
-    params: { studentId: string };
-}
+// For static export, we handle dynamic routes client-side
+// The studentId will be read from URL params at runtime
 
-// Dynamic route: /teacher/companion/[studentId]
-export default function CompanionDynamicPage({ params }: Props) {
-    return <CompanionWindowDynamic studentId={params.studentId} />;
+export default function CompanionDynamicPage() {
+    const params = useParams();
+    const studentId = params?.studentId as string;
+
+    if (!studentId) {
+        return <div className="p-8 text-center text-slate-500">Loading...</div>;
+    }
+
+    return <CompanionWindowDynamic studentId={studentId} />;
 }

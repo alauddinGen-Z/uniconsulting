@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:export": "set NEXT_PUBLIC_STATIC_EXPORT=true && next build",
+    "build:export": "node build-static.js",
     "start": "next start",
     "lint": "eslint"
   },

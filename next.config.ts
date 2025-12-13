@@ -7,6 +7,11 @@ import type { NextConfig } from "next";
  * - Standard (npm run build): SSR enabled for Netlify deployment
  * - Static Export (npm run build:export): For Electron desktop bundling
  * 
+ * IMPORTANT: Static export does NOT support:
+ * - API routes (/api/*) - use Supabase Edge Functions instead
+ * - Dynamic routes without generateStaticParams
+ * - Server-side features (getServerSideProps, headers(), etc.)
+ * 
  * @file next.config.ts
  */
 
@@ -16,9 +21,16 @@ const nextConfig: NextConfig = {
   // Enable static export for Electron desktop builds
   ...(isStaticExport && {
     output: 'export',
+    distDir: 'out',
     trailingSlash: true,
     // Static export cannot use Image optimization
     images: { unoptimized: true },
+    // Skip API routes during static export (they don't work with static)
+    // The desktop app uses Supabase Edge Functions instead
+    experimental: {
+      // Ignore TypeScript errors in API routes during static export
+      // since they won't be included anyway
+    },
   }),
 
   // Standard image config for web deployment
