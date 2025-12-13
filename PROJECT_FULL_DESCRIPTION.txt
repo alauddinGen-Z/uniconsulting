@@ -1,67 +1,407 @@
-# UniConsulting - MVP Product Description
+# UniConsulting - Comprehensive Project Documentation
+
+**Version:** 1.0.0 | **Last Updated:** 2025-12-13  
+**Live Demo:** https://uniconsulting.netlify.app  
+**Repository:** https://github.com/alauddinGen-Z/uniconsulting
+
+---
 
 ## Executive Summary
-UniConsulting is a **SaaS CRM platform** that helps university consulting agencies manage international student applications efficiently through AI-powered automation.
+
+UniConsulting is a **production-grade SaaS CRM platform** designed for university consulting agencies to manage international student applications. The platform leverages **Google Gemini 2.0 AI** for document processing, essay review, and university matching, while providing **real-time collaboration** through Supabase Realtime.
+
+> **Core Value Proposition:** "AI-powered university application management that reduces consultant workload by 60% while improving student experience."
 
 ---
 
 ## Problem Statement
-International students seeking admission to foreign universities face:
-- Complex document requirements (transcripts, test scores, passports)
-- Multiple essay drafts with no structured feedback
-- Scattered communication with consultants
-- Manual, error-prone data entry
-
-Consultants struggle with:
-- Managing 50+ students across different application stages
-- Repetitive document verification tasks
-- Inconsistent communication tracking
-
----
-
-## Solution: UniConsulting MVP
-
-### Core Value Proposition
-**"AI-powered university application management that reduces consultant workload by 60% while improving student experience."**
-
----
-
-## MVP Features
 
 ### For Students
-| Feature | Description |
-|---------|-------------|
-| **Document Upload + AI OCR** | Upload passport, transcripts, IELTS, SAT - AI extracts scores automatically |
-| **Essay Writing + AI Review** | Write essays, get instant AI feedback on grammar, clarity, structure |
-| **1:1 Consultant Chat** | Direct messaging with assigned consultant |
-| **Application Tracker** | View university list and application status |
+- Complex document requirements (transcripts, standardized tests, passports)
+- Multiple essay drafts with no structured AI feedback
+- Scattered communication with consultants via WhatsApp/Email
+- No visibility into application progress
 
-### For Consultants (Teachers)
-| Feature | Description |
-|---------|-------------|
-| **Kanban Dashboard** | Visual pipeline of students by stage (Lead → Applied → Accepted) |
-| **AI University Matcher** | Input student's GPA/scores → Get recommended universities |
-| **Student Management** | Approve registrations, view documents, track progress |
-| **Real-time Chat** | Respond to student queries with instant messaging |
+### For Consultants
+- Managing 50+ students across different application stages manually
+- Repetitive document verification and data entry tasks
+- Inconsistent communication tracking across platforms
+- Time-consuming university research for each student
 
 ---
 
-## Technology Highlights
-- **AI-Powered**: Google Gemini 2.0 for document OCR, essay review, university matching
-- **Real-time**: Live chat and instant updates via Supabase Realtime
-- **Multilingual**: English, Russian, Kyrgyz support built-in
-- **White-label Ready**: Customizable branding (colors, logo, name)
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          CLIENT LAYER                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Next.js 16 Web App    │   Electron Desktop    │   Chrome Extension │
+│  (React 19 + SPA)      │   (Python Automation) │   (Form AutoFill)  │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                           API LAYER                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│  /api/ai-review        │  AI Essay Feedback (Gemini 2.0)           │
+│  /api/document-ocr     │  Passport/Score Extraction (Gemini Vision)│
+│  /api/university-matcher│  AI University Recommendations           │
+│  /api/approve-student  │  Student Account Approval                 │
+│  /api/admin            │  Teacher Management (Admin)               │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         BACKEND LAYER                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Supabase PostgreSQL   │  Data Storage + Row Level Security        │
+│  Supabase Auth         │  Email/Password Authentication            │
+│  Supabase Realtime     │  Live Chat + Instant Updates              │
+│  Supabase Storage      │  Document File Storage                    │
+│  Edge Functions        │  University Matcher (Deno Runtime)        │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          AI LAYER                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  Google Gemini 2.0 Flash    │  Document OCR, Essay Review           │
+│  Gemini Pro Vision          │  Passport/Transcript Parsing          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technology Stack
+
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Next.js | 16.x | React framework with App Router |
+| React | 19.x | UI library |
+| TypeScript | 5.x | Type safety |
+| Tailwind CSS | 4.x | Utility-first styling |
+| Framer Motion | 12.x | Animations |
+| React Query | 5.x | Server state + caching |
+| Zustand | 5.x | Global client state |
+| Lucide React | 0.555 | Icon library |
+
+### Backend
+| Technology | Purpose |
+|------------|---------|
+| Supabase | PostgreSQL database, Auth, Realtime, Storage |
+| Supabase Edge Functions | Serverless Deno functions |
+| Next.js API Routes | AI integrations |
+
+### AI Services
+| Service | Purpose |
+|---------|---------|
+| Google Gemini 2.0 Flash | Fast AI processing |
+| Gemini Pro Vision | Document/image analysis |
+
+### Desktop App
+| Technology | Purpose |
+|------------|---------|
+| Electron | Cross-platform desktop wrapper |
+| Python + Browser-Use | AI-powered form automation |
+
+### Chrome Extension
+| Technology | Purpose |
+|------------|---------|
+| Plasmo Framework | Extension development |
+| Content Scripts | Form autofill on university portals |
+
+---
+
+## Feature Breakdown
+
+### 🎓 Student Portal
+
+#### Home Dashboard
+- Application completeness progress bar
+- Quick action cards (Upload Document, Write Essay, etc.)
+- Recent activity feed
+- Assigned consultant contact info
+
+#### Profile Management
+- Personal information form
+- Academic scores (GPA, IELTS, TOEFL, SAT)
+- Preferred countries/universities
+- Budget range configuration
+
+#### Document Management
+- **Upload Documents:** Passport, transcripts, test scores
+- **AI OCR Extraction:** Automatic score/data parsing via Gemini Vision
+- **Privacy Shield:** Documents auto-deleted after AI processing
+- **Status Tracking:** Pending → Verified → Approved workflow
+
+#### Essay Writing Studio
+- Rich text editor for essay drafting
+- **AI Essay Review:** Grammar, structure, clarity feedback
+- Version history with diff comparison
+- Word count tracking
+
+#### University Applications
+- Target university list management
+- Application status tracking (Researching → Applied → Accepted)
+- Deadline calendar
+- AI-recommended universities
+
+#### Real-time Chat
+- 1:1 messaging with assigned consultant
+- Unread message badges
+- Voice input (Web Speech API)
+- Message read receipts
+
+---
+
+### 👨‍🏫 Teacher Dashboard (Command Center)
+
+#### Home Dashboard
+- Statistics cards (Total Students, Pending Approvals, Documents)
+- Recent activity feed
+- Calendar with upcoming deadlines
+- Quick actions panel
+
+#### Student Management
+- Full student list with search/filter
+- Student detail view (all documents, essays, scores)
+- Kanban board view by application stage
+- Batch operations
+
+#### Pending Approvals
+- New registration queue
+- Approve/Reject workflow
+- Student preview before approval
+
+#### AI University Matcher
+- Input: Student GPA, test scores, budget, preferences
+- Output: Ranked university recommendations
+- **Strict Logic Rules:**
+  - IELTS sectional score requirements
+  - SAT section score requirements
+  - Budget constraints
+
+#### Automation Hub (Desktop Only)
+- Select student profile
+- AI agent auto-fills university application forms
+- Real-time log streaming
+- Powered by Python Browser-Use library
+
+#### Admin Panel (Admin Users Only)
+- Add/remove teachers
+- Manage user roles
+- System configuration
+
+---
+
+### 💬 Real-time Chat System
+
+- WhatsApp-style threaded conversations
+- Supabase Realtime subscriptions
+- Typing indicators
+- Message status (sent/delivered/read)
+- Unread count badges in navigation
+- Voice-to-text input
+
+---
+
+### 🌐 Internationalization (i18n)
+
+| Language | Code |
+|----------|------|
+| English | en |
+| Russian | ru |
+| Kyrgyz | kg |
+
+Dynamic language switching with LocalStorage persistence.
+
+---
+
+### 🎨 White-Label Theming
+
+Configurable brand themes:
+- **UniConsulting** (Default): Orange/Pink gradient
+- **Global Compass**: Blue/Cyan theme
+
+Theme configuration via `ACTIVE_THEME` constant.
+
+---
+
+## Database Schema (Key Tables)
+
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User profiles (students + teachers) |
+| `student_documents` | Uploaded documents with metadata |
+| `essays` | Essay drafts and AI feedback |
+| `essay_versions` | Version history for essays |
+| `student_universities` | University applications |
+| `conversations` | Chat conversation threads |
+| `messages` | Individual chat messages |
+
+**Row Level Security (RLS):** All tables protected with policies for:
+- Students can only access their own data
+- Teachers can access their assigned students
+- Admins have full access
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/ai-review` | POST | Get AI essay feedback |
+| `/api/document-ocr` | POST | Extract data from documents |
+| `/api/university-matcher` | POST | Get university recommendations |
+| `/api/approve-student` | POST | Approve/reject student registration |
+| `/api/admin/add-teacher` | POST | Create new teacher account |
+| `/api/proxy` | POST | CORS proxy for external APIs |
+
+---
+
+## State Management Architecture
+
+### Global State (Zustand)
+```typescript
+interface AppState {
+  user: { id, name, email, role, avatarUrl } | null
+  unreadNotificationCount: number
+  currentClassId: string | null
+}
+```
+
+### Server State (React Query)
+- **5-minute staleTime** for instant cached data
+- **30-minute gcTime** for persistent cache
+- **Background refetch** on window focus
+- **Smart prefetching** on link hover
+
+### Context Providers
+- `AuthContext` - Session management
+- `StudentDataContext` - Student-specific data
+- `TeacherDataContext` - Teacher-specific data
+- `LanguageContext` - i18n strings
+
+---
+
+## SPA Navigation Architecture
+
+### Persistent Shell Layouts
+- **Student Shell:** Sidebar + mobile header stay mounted
+- **Teacher Shell:** Command center sidebar + floating badge
+
+### URL-Based Routing
+```
+/student/home        → HomeDashboard
+/student/profile     → ProfilePage
+/student/documents   → DocumentsTabPage
+/student/application → ApplicationPage
+/student/messages    → StudentChat
+
+/teacher/home        → TeacherHomeDashboard
+/teacher/students    → StudentListView
+/teacher/pending     → PendingStudentsView
+/teacher/messages    → WhatsAppChat
+/teacher/automation  → AutomationView
+/teacher/ai-matcher  → AIMatcherView
+/teacher/admin       → AdminPanel
+```
+
+### No Page Reloads
+- Next.js `<Link>` with prefetch enabled
+- Hover-based data prefetching
+- Instant navigation (Discord/Spotify-like UX)
+
+---
+
+## Desktop Application
+
+### Electron Wrapper
+- Persistent login via saved auth tokens
+- Native window controls
+- Auto-updater support
+
+### Python Automation Engine
+- Uses `browser-use` library for AI-driven form filling
+- Receives student profile JSON
+- Opens browser and fills university application forms
+- Streams progress logs to Electron UI
+
+---
+
+## Chrome Extension
+
+### Features
+- Quick student data lookup
+- Form autofill on university portals
+- Supabase authentication sync
+
+### Technology
+- Plasmo framework for cross-browser compatibility
+- Content scripts for DOM manipulation
+
+---
+
+## Deployment Configuration
+
+### Netlify (Frontend)
+```toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+```
+
+### Environment Variables
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+GEMINI_API_KEY=...
+GOOGLE_AI_API_KEY=...
+```
+
+---
+
+## Security Features
+
+- **Row Level Security (RLS):** Database-level access control
+- **Privacy Shield:** Documents auto-deleted after AI processing
+- **HTTPS Only:** All traffic encrypted
+- **Auth Token Management:** Secure session handling
+- **CORS Configuration:** Strict origin policies
+
+---
+
+## Performance Optimizations
+
+- **Stale-While-Revalidate:** Instant cached data display
+- **Smart Prefetching:** Data loaded on link hover
+- **Code Splitting:** Automatic via Next.js
+- **Image Optimization:** Next.js Image component
+- **Lazy Loading:** Heavy components loaded on demand
 
 ---
 
 ## Target Users
-1. **Primary**: Small-to-medium university consulting agencies (5-50 consultants)
-2. **Secondary**: Independent education consultants
-3. **End Users**: International students (primarily from CIS countries)
+
+| Segment | Description |
+|---------|-------------|
+| **Primary** | Small-to-medium consulting agencies (5-50 consultants) |
+| **Secondary** | Independent education consultants |
+| **End Users** | International students (primarily CIS countries) |
 
 ---
 
-## MVP Metrics (Success Criteria)
+## Success Metrics
+
 | Metric | Target |
 |--------|--------|
 | Document processing time | < 30 seconds (vs 5+ minutes manual) |
@@ -71,31 +411,41 @@ Consultants struggle with:
 
 ---
 
-## Current Status: Production-Ready MVP ✅
+## Future Roadmap
 
-### What's Built
-- ✅ Student & Teacher authentication
-- ✅ Document upload with AI extraction
-- ✅ Essay writing with AI review
-- ✅ AI University Matcher
-- ✅ Real-time 1:1 chat
-- ✅ Kanban pipeline view
-- ✅ Multilingual UI (EN/RU/KG)
-
-### What's Next (Post-MVP)
 - 🔄 Email notifications
-- 🔄 Payment integration
-- 🔄 Mobile app
-- 🔄 Multi-tenant (agency white-labeling)
+- 🔄 Payment integration (Stripe)
+- 🔄 Mobile app (React Native)
+- 🔄 Multi-tenant SaaS (agency white-labeling)
 - 🔄 Analytics dashboard
+- 🔄 Calendar integration (Google Calendar)
 
 ---
 
-## Deployment
-- **Frontend**: Netlify (https://uniconsulting.netlify.app)
-- **Backend**: Supabase Cloud
-- **AI**: Google Gemini API
+## Getting Started
+
+### Prerequisites
+- Node.js 20+
+- Supabase account
+- Google AI API key
+
+### Installation
+```bash
+git clone https://github.com/alauddinGen-Z/uniconsulting.git
+cd uniconsulting
+npm install
+cp .env.example .env.local
+# Configure environment variables
+npm run dev
+```
+
+### Desktop App
+```bash
+cd desktop-app
+npm install
+npm run dev
+```
 
 ---
 
-*Version: MVP 1.0 | Last Updated: 2025-12-13*
+*© 2025 UniConsulting. All rights reserved.*
