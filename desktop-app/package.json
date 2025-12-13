@@ -1,0 +1,95 @@
+{
+    "name": "uniconsulting-desktop",
+    "version": "1.0.0",
+    "description": "UniConsulting Desktop - AI-Powered University Application Assistant",
+    "main": "main.js",
+    "author": "UniConsulting Team",
+    "license": "MIT",
+    "homepage": "https://uniconsulting.netlify.app",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/alauddinGen-Z/uniconsulting.git"
+    },
+    "scripts": {
+        "start": "electron .",
+        "dev": "set ELECTRON_DEV=true && electron .",
+        "build": "electron-builder",
+        "build-python": "node build-agent.js",
+        "dist": "npm run build-python && npm run build",
+        "dist:win": "npm run build-python && electron-builder --win",
+        "dist:mac": "npm run build-python && electron-builder --mac",
+        "dist:linux": "npm run build-python && electron-builder --linux"
+    },
+    "dependencies": {
+        "electron-is-dev": "^3.0.1",
+        "electron-updater": "^6.1.7"
+    },
+    "devDependencies": {
+        "electron": "^28.1.0",
+        "electron-builder": "^24.9.1"
+    },
+    "build": {
+        "appId": "com.uniconsulting.desktop",
+        "productName": "UniConsulting",
+        "copyright": "Copyright © 2024 UniConsulting",
+        "directories": {
+            "output": "dist",
+            "buildResources": "assets"
+        },
+        "files": [
+            "main.js",
+            "preload.js",
+            "renderer/**/*"
+        ],
+        "extraResources": [
+            {
+                "from": "../out",
+                "to": "app",
+                "filter": [
+                    "**/*"
+                ]
+            },
+            {
+                "from": "python/dist/agent",
+                "to": "agent",
+                "filter": [
+                    "**/*"
+                ]
+            }
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "assets/icon.ico",
+            "artifactName": "${productName}-Setup-${version}.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "installerIcon": "assets/icon.ico",
+            "uninstallerIcon": "assets/icon.ico",
+            "installerHeaderIcon": "assets/icon.ico"
+        },
+        "mac": {
+            "target": "dmg",
+            "icon": "assets/icon.icns",
+            "category": "public.app-category.education"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "assets/icon.png",
+            "category": "Education"
+        },
+        "publish": {
+            "provider": "github",
+            "owner": "alauddinGen-Z",
+            "repo": "uniconsulting"
+        }
+    }
+}
