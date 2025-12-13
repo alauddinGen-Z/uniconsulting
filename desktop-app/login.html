@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login Page - Deep Link Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .container {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .info-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .info-box h3 {
+            color: #f97316;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-box p {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        code {
+            background: #334155;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #22c55e;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #f8fafc;
+            border: 1px solid #475569;
+        }
+
+        .token-preview {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #22c55e;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+
+        .warning {
+            color: #f59e0b;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔐 Test Login Page</h1>
+        <p class="subtitle">Deep Link Authentication Simulator</p>
+
+        <div class="info-box">
+            <h3>How it works</h3>
+            <p>
+                This page simulates your real login server. When you click the button below,
+                it will redirect to <code>uniconsulting://auth?token=...</code> which the
+                desktop app will intercept and handle.
+            </p>
+        </div>
+
+        <a href="#" class="btn btn-success" id="loginBtn" onclick="simulateLogin()">
+            ✅ Simulate Successful Login
+        </a>
+
+        <a href="#" class="btn btn-secondary" onclick="simulateLoginWithEmail()">
+            📧 Login with Email Parameter
+        </a>
+
+        <div class="token-preview" id="tokenPreview">
+            Token will appear here...
+        </div>
+
+        <p class="warning">
+            ⚠️ Make sure the UniConsulting desktop app is running before clicking!
+        </p>
+    </div>
+
+    <script>
+        // Generate a random token (in real app, this comes from your server)
+        function generateToken() {
+            return 'TEST_TOKEN_' + Math.random().toString(36).substring(2, 15) +
+                '_' + Date.now().toString(36);
+        }
+
+        // Simulate successful login with deep link redirect
+        function simulateLogin() {
+            const token = generateToken();
+
+            // Show the token being generated
+            document.getElementById('tokenPreview').textContent =
+                `Generated Token: ${token}\n\nRedirecting to: uniconsulting://auth?token=${token}`;
+
+            // Small delay to show the token, then redirect
+            setTimeout(() => {
+                // This is the deep link URL the desktop app will intercept
+                // CHANGE 'uniconsulting' to your custom protocol if different
+                window.location.href = `uniconsulting://auth?token=${token}`;
+            }, 1000);
+        }
+
+        // Simulate login with additional parameters
+        function simulateLoginWithEmail() {
+            const token = generateToken();
+            const email = 'test@example.com';
+            const refreshToken = 'REFRESH_' + generateToken();
+
+            document.getElementById('tokenPreview').textContent =
+                `Generated Token: ${token}\nEmail: ${email}\n\nRedirecting...`;
+
+            setTimeout(() => {
+                // Include email and refresh token in the deep link
+                const params = new URLSearchParams({
+                    token: token,
+                    refresh_token: refreshToken,
+                    email: email
+                });
+
+                window.location.href = `uniconsulting://auth?${params.toString()}`;
+            }, 1000);
+        }
+    </script>
+</body>
+
+</html>

@@ -1,7 +1,7 @@
 {
     "name": "uniconsulting-desktop",
     "version": "1.0.0",
-    "description": "UniConsulting Desktop - Thin Client with Python Automation",
+    "description": "UniConsulting Desktop - AI-Powered University Application Assistant",
     "main": "main.js",
     "author": "UniConsulting Team",
     "license": "MIT",
@@ -16,10 +16,12 @@
         "build": "electron-builder",
         "build-python": "node build-engine.js",
         "dist": "npm run build-python && npm run build",
-        "dist:win": "npm run build-python && electron-builder --win"
+        "dist:win": "electron-builder --win",
+        "dist:mac": "electron-builder --mac",
+        "dist:linux": "electron-builder --linux"
     },
     "dependencies": {
-        "electron-is-dev": "^3.0.1"
+        "electron-store": "^8.1.0"
     },
     "devDependencies": {
         "electron": "^28.1.0",
@@ -28,13 +30,15 @@
     "build": {
         "appId": "com.uniconsulting.desktop",
         "productName": "UniConsulting",
+        "copyright": "Copyright © 2024 UniConsulting",
         "directories": {
             "output": "dist",
             "buildResources": "assets"
         },
         "files": [
             "main.js",
-            "preload.js"
+            "preload.js",
+            "index.html"
         ],
         "extraResources": [
             {
@@ -45,13 +49,45 @@
                 ]
             }
         ],
+        "protocols": [
+            {
+                "name": "UniConsulting",
+                "schemes": [
+                    "uniconsulting"
+                ]
+            }
+        ],
         "win": {
-            "target": "nsis",
-            "icon": "assets/icon.ico"
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "assets/icon.ico",
+            "artifactName": "${productName}-Setup-${version}.${ext}"
         },
         "nsis": {
-            "oneClick": true,
-            "installerHeaderIcon": "assets/icon.ico"
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "perMachine": false,
+            "installerIcon": "assets/icon.ico",
+            "uninstallerIcon": "assets/icon.ico",
+            "installerHeaderIcon": "assets/icon.ico",
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true
+        },
+        "mac": {
+            "target": "dmg",
+            "icon": "assets/icon.icns",
+            "category": "public.app-category.education"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "assets/icon.png",
+            "category": "Education"
         },
         "publish": {
             "provider": "github",

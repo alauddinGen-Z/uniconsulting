@@ -1,27 +1,68 @@
 /**
- * Electron Main Process - Thin Client Architecture
+ * Electron Main Process - Production-Ready Boilerplate
  * 
- * Loads the remote Netlify web app and provides a secure bridge
- * to the local Python automation engine.
- * 
- * Architecture: Discord-style (remote URL + local sidecar)
+ * Features:
+ * - No default menu bar (clean window)
+ * - Custom protocol deep linking (myapp://)
+ * - Single instance lock
+ * - Browser-based authentication flow
+ * - Secure token storage
  * 
  * @file desktop-app/main.js
  */
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+
+// ============================================================================
+// CONFIGURATION - Customize these values
+// ============================================================================
+
+// Custom protocol scheme (e.g., myapp://, uniconsulting://)
+const PROTOCOL_SCHEME = 'uniconsulting';
+
+// Your web app URLs
 const isDev = process.env.ELECTRON_DEV === 'true';
-
-// Remote app URL
-// Development: localhost for instant testing
-// Production: Netlify (always latest version)
-const APP_URL = isDev
+const WEB_APP_URL = isDev
     ? 'http://localhost:3000'
-    : (process.env.APP_URL || 'https://uniconsulting.netlify.app');
+    : 'https://uniconsulting.netlify.app';
 
-// Keep global references
+// Login page URL (where users will authenticate)
+const LOGIN_URL = `${WEB_APP_URL}/login?desktop=true`;
+
+// ============================================================================
+// Token Storage (using electron-store)
+// ============================================================================
+
+let Store;
+let store;
+
+try {
+    Store = require('electron-store');
+    store = new Store({
+        encryptionKey: 'uniconsulting-secure-key-2024', // Change this!
+        schema: {
+            authToken: { type: 'string', default: '' },
+            refreshToken: { type: 'string', default: '' },
+            userEmail: { type: 'string', default: '' },
+        }
+    });
+} catch (e) {
+    console.log('[Main] electron-store not available, using in-memory storage');
+    // Fallback to in-memory storage if electron-store is not installed
+    store = {
+        _data: {},
+        get: (key) => store._data[key] || '',
+        set: (key, value) => { store._data[key] = value; },
+        delete: (key) => { delete store._data[key]; },
+    };
+}
+
+// ============================================================================
+// Global References
+// ============================================================================
+
 let mainWindow = null;
 let engineProcess = null;
 
@@ -34,10 +75,99 @@ function log(message) {
 }
 
 // ============================================================================
-// Window Management
+// Custom Protocol Registration
+// ============================================================================
+
+// Register the protocol scheme with Windows
+if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+    }
+} else {
+    app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+}
+
+log(`Registered protocol: ${PROTOCOL_SCHEME}://`);
+
+// ============================================================================
+// Single Instance Lock
+// ============================================================================
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    log('Another instance is already running. Exiting...');
+    app.quit();
+} else {
+    // Handle second instance (Windows/Linux)
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        log('Second instance detected');
+
+        // Find the deep link URL in command line args
+        const deepLinkUrl = commandLine.find(arg => arg.startsWith(`${PROTOCOL_SCHEME}://`));
+
+        if (deepLinkUrl) {
+            log(`Deep link received: ${deepLinkUrl}`);
+            handleDeepLink(deepLinkUrl);
+        }
+
+        // Focus the existing window
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
+
+// Handle open-url event (macOS)
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    log(`open-url received: ${url}`);
+    handleDeepLink(url);
+});
+
+// ============================================================================
+// Deep Link Handler
+// ============================================================================
+
+function handleDeepLink(url) {
+    try {
+        const parsedUrl = new URL(url);
+
+        // Handle auth callback: uniconsulting://auth?token=XYZ
+        if (parsedUrl.hostname === 'auth' || parsedUrl.pathname === '/auth') {
+            const token = parsedUrl.searchParams.get('token');
+            const refreshToken = parsedUrl.searchParams.get('refresh_token');
+            const email = parsedUrl.searchParams.get('email');
+
+            if (token) {
+                log('Auth token received from deep link');
+
+                // Store the tokens
+                store.set('authToken', token);
+                if (refreshToken) store.set('refreshToken', refreshToken);
+                if (email) store.set('userEmail', email);
+
+                // Notify the renderer
+                if (mainWindow) {
+                    mainWindow.webContents.send('auth-success', { token, email });
+                    mainWindow.focus();
+                }
+            }
+        }
+    } catch (error) {
+        log(`Error parsing deep link: ${error.message}`);
+    }
+}
+
+// ============================================================================
+// Window Creation
 // ============================================================================
 
 function createWindow() {
+    // CRUCIAL: Remove the default menu bar
+    Menu.setApplicationMenu(null);
+
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -47,25 +177,34 @@ function createWindow() {
         icon: path.join(__dirname, 'assets', 'icon.png'),
         show: false,
         backgroundColor: '#0f172a',
+        // Hide menu bar (alternative method)
+        autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            // CRUCIAL SECURITY SETTINGS
-            contextIsolation: true,      // Required for security
-            nodeIntegration: false,      // Never allow for remote URLs
-            sandbox: true,               // Extra isolation
-            webSecurity: true,           // Enforce same-origin policy
-            allowRunningInsecureContent: false,
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+            webSecurity: !isDev,
         },
     });
 
-    // Load the remote Netlify app
-    log(`Loading remote app: ${APP_URL}`);
-    mainWindow.loadURL(APP_URL);
+    // Load the web app
+    log(`Loading: ${WEB_APP_URL}`);
+    mainWindow.loadURL(WEB_APP_URL);
 
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        log('Window ready');
+
+        // Check if we have a stored token
+        const token = store.get('authToken');
+        if (token) {
+            log('Found stored auth token');
+            mainWindow.webContents.send('auth-restored', {
+                token,
+                email: store.get('userEmail')
+            });
+        }
     });
 
     // Open DevTools in development
@@ -73,18 +212,15 @@ function createWindow() {
         mainWindow.webContents.openDevTools();
     }
 
-    // Handle external links - open in default browser
+    // Handle external links
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        // Allow navigation within our app
-        if (url.includes('uniconsulting') || url.includes('supabase')) {
+        if (url.includes('localhost') || url.includes('uniconsulting') || url.includes('supabase')) {
             return { action: 'allow' };
         }
-        // Open external links in default browser
         shell.openExternal(url);
         return { action: 'deny' };
     });
 
-    // Handle window closed
     mainWindow.on('closed', () => {
         mainWindow = null;
         killEngine();
@@ -97,13 +233,11 @@ function createWindow() {
 
 function getEnginePath() {
     if (isDev) {
-        // Development: run Python script directly
         return {
             command: 'python',
             args: [path.join(__dirname, 'python', 'engine.py')],
         };
     } else {
-        // Production: run bundled executable
         const engineExe = process.platform === 'win32' ? 'engine.exe' : 'engine';
         return {
             command: path.join(process.resourcesPath, 'engine', engineExe),
@@ -116,14 +250,14 @@ function killEngine() {
     if (engineProcess) {
         engineProcess.kill();
         engineProcess = null;
-        log('Engine process killed');
+        log('Engine killed');
     }
 }
 
 async function runEngine(studentData) {
     return new Promise((resolve, reject) => {
         if (engineProcess) {
-            reject(new Error('Engine is already running'));
+            reject(new Error('Engine already running'));
             return;
         }
 
@@ -134,51 +268,32 @@ async function runEngine(studentData) {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: {
                 ...process.env,
-                // Pass API key to Python process
                 GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '',
             },
         });
 
-        // Send student data via stdin
         engineProcess.stdin.write(JSON.stringify(studentData));
         engineProcess.stdin.end();
 
         let output = '';
-        let errorOutput = '';
 
-        // Stream stdout to renderer
         engineProcess.stdout.on('data', (data) => {
-            const message = data.toString().trim();
-            output += message + '\n';
-            log(`[Engine] ${message}`);
-
+            const msg = data.toString().trim();
+            output += msg + '\n';
             if (mainWindow) {
-                mainWindow.webContents.send('engine-log', {
-                    type: 'stdout',
-                    message
-                });
+                mainWindow.webContents.send('engine-log', { type: 'stdout', message: msg });
             }
         });
 
-        // Stream stderr to renderer
         engineProcess.stderr.on('data', (data) => {
-            const message = data.toString().trim();
-            errorOutput += message + '\n';
-            log(`[Engine Error] ${message}`);
-
+            const msg = data.toString().trim();
             if (mainWindow) {
-                mainWindow.webContents.send('engine-log', {
-                    type: 'stderr',
-                    message
-                });
+                mainWindow.webContents.send('engine-log', { type: 'stderr', message: msg });
             }
         });
 
-        // Handle process exit
         engineProcess.on('close', (code) => {
-            log(`Engine exited with code: ${code}`);
             engineProcess = null;
-
             if (code === 0) {
                 resolve({ success: true, output });
             } else {
@@ -187,7 +302,6 @@ async function runEngine(studentData) {
         });
 
         engineProcess.on('error', (error) => {
-            log(`Engine spawn error: ${error.message}`);
             engineProcess = null;
             reject(error);
         });
@@ -195,25 +309,39 @@ async function runEngine(studentData) {
 }
 
 // ============================================================================
-// IPC Handlers - Restricted API for website
+// IPC Handlers
 // ============================================================================
 
-// Check if running in desktop app
 ipcMain.handle('is-desktop', () => true);
 
-// Run the automation engine (ONLY exposed function for automation)
+ipcMain.handle('get-auth-token', () => ({
+    token: store.get('authToken'),
+    email: store.get('userEmail'),
+}));
+
+ipcMain.handle('login-with-browser', () => {
+    log(`Opening login URL: ${LOGIN_URL}`);
+    shell.openExternal(LOGIN_URL);
+    return { success: true };
+});
+
+ipcMain.handle('logout', () => {
+    store.delete('authToken');
+    store.delete('refreshToken');
+    store.delete('userEmail');
+    log('User logged out');
+    return { success: true };
+});
+
 ipcMain.handle('run-agent', async (event, studentData) => {
     try {
-        log(`Running engine for: ${studentData?.full_name || 'Unknown'}`);
         const result = await runEngine(studentData);
         return { success: true, ...result };
     } catch (error) {
-        log(`Engine error: ${error.message}`);
         return { success: false, error: error.message };
     }
 });
 
-// Stop running engine
 ipcMain.handle('stop-agent', () => {
     killEngine();
     return { success: true };
@@ -243,18 +371,11 @@ app.on('before-quit', () => {
     killEngine();
 });
 
-// Security: Restrict navigation
-app.on('web-contents-created', (event, contents) => {
-    // Prevent navigation to untrusted URLs
-    contents.on('will-navigate', (event, url) => {
-        const allowed = ['uniconsulting', 'supabase', 'netlify', 'localhost'];
-        const isAllowed = allowed.some(domain => url.includes(domain));
+// Handle deep link from app startup (Windows)
+const deepLinkArg = process.argv.find(arg => arg.startsWith(`${PROTOCOL_SCHEME}://`));
+if (deepLinkArg) {
+    log(`Deep link from startup: ${deepLinkArg}`);
+    app.whenReady().then(() => handleDeepLink(deepLinkArg));
+}
 
-        if (!isAllowed && !url.startsWith('file:')) {
-            log(`Blocked navigation to: ${url}`);
-            event.preventDefault();
-        }
-    });
-});
-
-log('UniConsulting Desktop (Thin Client) starting...');
+log('UniConsulting Desktop starting...');

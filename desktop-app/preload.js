@@ -1,69 +1,91 @@
 /**
- * Electron Preload Script - Secure Bridge
+ * Electron Preload Script
  * 
- * Exposes a RESTRICTED API to the remote website.
- * Only runAgent and log streaming are exposed.
- * 
- * SECURITY: This is the ONLY way the website can interact
- * with the local filesystem/Python engine.
+ * Secure bridge between main process and renderer.
+ * Exposes authentication and automation APIs.
  * 
  * @file desktop-app/preload.js
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose RESTRICTED API to the website
+// Expose secure API to the website
 contextBridge.exposeInMainWorld('electron', {
     // ============================================================================
     // Desktop Detection
     // ============================================================================
 
-    /**
-     * Check if running in desktop app
-     */
     isDesktop: true,
 
     // ============================================================================
-    // Automation Engine API
+    // Authentication API
+    // ============================================================================
+
+    /**
+     * Get stored authentication token
+     * @returns {Promise<{token: string, email: string}>}
+     */
+    getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
+
+    /**
+     * Open browser for login (deep link flow)
+     * After login, browser redirects to uniconsulting://auth?token=XYZ
+     */
+    loginWithBrowser: () => ipcRenderer.invoke('login-with-browser'),
+
+    /**
+     * Clear stored authentication tokens
+     */
+    logout: () => ipcRenderer.invoke('logout'),
+
+    /**
+     * Listen for successful authentication from deep link
+     * @param {Function} callback - Called with {token, email}
+     * @returns {Function} Cleanup function
+     */
+    onAuthSuccess: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('auth-success', handler);
+        return () => ipcRenderer.removeListener('auth-success', handler);
+    },
+
+    /**
+     * Listen for restored auth from stored token
+     * @param {Function} callback - Called with {token, email}
+     * @returns {Function} Cleanup function
+     */
+    onAuthRestored: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('auth-restored', handler);
+        return () => ipcRenderer.removeListener('auth-restored', handler);
+    },
+
+    // ============================================================================
+    // Automation API
     // ============================================================================
 
     /**
      * Run the Python automation engine
-     * This is the ONLY way the website can trigger local automation
-     * 
      * @param {Object} studentData - Student profile data
-     * @returns {Promise<{success: boolean, error?: string, output?: string}>}
+     * @returns {Promise<{success: boolean, error?: string}>}
      */
-    runAgent: (studentData) => {
-        console.log('[Preload] runAgent called for:', studentData?.full_name);
-        return ipcRenderer.invoke('run-agent', studentData);
-    },
+    runAgent: (studentData) => ipcRenderer.invoke('run-agent', studentData),
 
     /**
-     * Stop the running engine
-     * @returns {Promise<{success: boolean}>}
+     * Stop the running automation engine
      */
-    stopAgent: () => {
-        console.log('[Preload] stopAgent called');
-        return ipcRenderer.invoke('stop-agent');
-    },
+    stopAgent: () => ipcRenderer.invoke('stop-agent'),
 
     /**
      * Listen for engine log messages
-     * Streams stdout/stderr from Python engine to the UI
-     * 
-     * @param {Function} callback - Called with {type: 'stdout'|'stderr', message: string}
-     * @returns {Function} Cleanup function to remove listener
+     * @param {Function} callback - Called with {type, message}
+     * @returns {Function} Cleanup function
      */
     onAgentLog: (callback) => {
         const handler = (event, data) => callback(data);
         ipcRenderer.on('engine-log', handler);
-
-        // Return cleanup function
-        return () => {
-            ipcRenderer.removeListener('engine-log', handler);
-        };
+        return () => ipcRenderer.removeListener('engine-log', handler);
     },
 });
 
-console.log('[Preload] UniConsulting Desktop bridge initialized (Thin Client)');
+console.log('[Preload] UniConsulting Desktop bridge initialized');
