@@ -44,7 +44,8 @@
             "main.js",
             "preload.js",
             "splash.html",
-            "index.html"
+            "index.html",
+            "frontend/**/*"
         ],
         "extraResources": [
             {
@@ -79,12 +80,14 @@
             "oneClick": false,
             "allowToChangeInstallationDirectory": true,
             "perMachine": true,
+            "allowElevation": true,
             "installerIcon": "assets/icon.ico",
             "uninstallerIcon": "assets/icon.ico",
             "installerHeaderIcon": "assets/icon.ico",
-            "createDesktopShortcut": true,
+            "createDesktopShortcut": "always",
             "createStartMenuShortcut": true,
             "shortcutName": "UniConsulting",
+            "menuCategory": "UniConsulting",
             "runAfterFinish": true
         },
         "mac": {
