@@ -10,6 +10,7 @@ import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
 import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 import { ACTIVE_THEME } from "@/lib/theme-config";
+import { useLanguage } from "@/lib/i18n";
 
 interface DashboardSidebarProps {
     activeTab: string;
@@ -26,6 +27,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
     const router = useRouter();
     const supabase = createClient();
     const { unreadCount } = useUnreadMessageCount();
+    const { t } = useLanguage();
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -74,11 +76,11 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
     };
 
     const navItems = [
-        { id: "home", label: "Home", icon: Home },
-        { id: "profile", label: "Profile", icon: User },
-        { id: "application", label: "Application", icon: GraduationCap, hasAI: true },
-        { id: "documents", label: "Documents", icon: FolderOpen },
-        { id: "messages", label: "Chat", icon: MessageCircle },
+        { id: "home", label: t("nav.dashboard"), icon: Home },
+        { id: "profile", label: t("nav.profile"), icon: User },
+        { id: "application", label: t("nav.application"), icon: GraduationCap, hasAI: true },
+        { id: "documents", label: t("nav.documents"), icon: FolderOpen },
+        { id: "messages", label: t("nav.messages"), icon: MessageCircle },
     ];
 
     return (
@@ -113,7 +115,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 py-4 space-y-2">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">Menu</div>
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">{t("nav.menu")}</div>
                     {navItems.map((item) => (
                         <button
                             key={item.id}
@@ -168,7 +170,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
                         onClick={() => setShowLogoutConfirm(true)}
                         className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700/50 hover:border-red-500/30 transition-all text-xs font-medium"
                     >
-                        <LogOut className="w-3.5 h-3.5" /> Sign Out
+                        <LogOut className="w-3.5 h-3.5" /> {t("action.sign_out")}
                     </button>
                 </div>
             </div>

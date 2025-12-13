@@ -3,6 +3,7 @@ import { Montserrat, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ACTIVE_THEME } from "@/lib/theme-config";
+import { LanguageProvider } from "@/lib/i18n";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -45,10 +46,13 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} ${inter.variable} antialiased`}
       >
-        {children}
-        <Toaster position="top-right" />
+        <LanguageProvider>
+          {children}
+          <Toaster position="top-right" />
+        </LanguageProvider>
       </body>
     </html>
   );
 }
+
 

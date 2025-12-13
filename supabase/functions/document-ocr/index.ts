@@ -6,7 +6,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-auth",
+    "Access-Control-Max-Age": "86400",
 };
 
 interface OCRRequest {
@@ -67,7 +69,10 @@ serve(async (req: Request) => {
 
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders
+        });
     }
 
     try {

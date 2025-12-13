@@ -5,6 +5,8 @@ import { X, Lock, Bell, Palette, Trash2, Loader2, Check, Eye, EyeOff, AlertTrian
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useLanguage } from "@/lib/i18n";
+import { Globe } from "lucide-react";
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -28,6 +30,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     });
     const supabase = createClient();
     const router = useRouter();
+    const { language, setLanguage, t } = useLanguage();
 
     const handlePasswordChange = async () => {
         if (!newPassword || !confirmPassword) {
@@ -68,9 +71,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (!isOpen) return null;
 
     const tabs = [
-        { id: 'password', label: 'Security', icon: Lock },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'appearance', label: 'Appearance', icon: Palette },
+        { id: 'password', label: t('settings.security'), icon: Lock },
+        { id: 'notifications', label: t('settings.notifications'), icon: Bell },
+        { id: 'appearance', label: t('settings.appearance'), icon: Palette },
     ];
 
     return (
@@ -85,7 +88,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 fade-in duration-200">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+                    <h2 className="text-xl font-bold text-slate-900">{t('settings.title')}</h2>
                     <button
                         onClick={onClose}
                         className="p-2 rounded-full hover:bg-slate-100 transition-colors"
@@ -116,14 +119,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     {activeTab === 'password' && (
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">New Password</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{t('password.new')}</label>
                                 <div className="relative">
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
                                         className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none"
-                                        placeholder="Enter new password"
+                                        placeholder={t('password.new')}
                                     />
                                     <button
                                         type="button"
@@ -135,13 +138,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Confirm New Password</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{t('password.confirm')}</label>
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none"
-                                    placeholder="Confirm new password"
+                                    placeholder={t('password.confirm')}
                                 />
                             </div>
                             <button
@@ -150,7 +153,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 className="w-full py-3 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                Update Password
+                                {t('password.update')}
                             </button>
                         </div>
                     )}
@@ -183,12 +186,37 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                     {activeTab === 'appearance' && (
                         <div className="space-y-6">
+                            {/* Language Switcher */}
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Theme</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-3">{t('settings.language')}</label>
                                 <div className="grid grid-cols-3 gap-3">
-                                    <ThemeOption label="Light" active={true} color="bg-white" />
-                                    <ThemeOption label="Dark" active={false} color="bg-slate-800" />
-                                    <ThemeOption label="System" active={false} color="bg-gradient-to-br from-white to-slate-800" />
+                                    <button
+                                        onClick={() => setLanguage('en')}
+                                        className={`p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${language === 'en' ? 'border-orange-500 bg-orange-50 text-orange-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                    >
+                                        🇺🇸 English
+                                    </button>
+                                    <button
+                                        onClick={() => setLanguage('ru')}
+                                        className={`p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${language === 'ru' ? 'border-orange-500 bg-orange-50 text-orange-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                    >
+                                        🇷🇺 Русский
+                                    </button>
+                                    <button
+                                        onClick={() => setLanguage('kg')}
+                                        className={`p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${language === 'kg' ? 'border-orange-500 bg-orange-50 text-orange-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                    >
+                                        🇰🇬 Кыргыз
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-3">{t('settings.appearance')}</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <ThemeOption label={t('theme.light')} active={true} color="bg-white" />
+                                    <ThemeOption label={t('theme.dark')} active={false} color="bg-slate-800" />
+                                    <ThemeOption label={t('theme.system')} active={false} color="bg-gradient-to-br from-white to-slate-800" />
                                 </div>
                             </div>
                             <div className="pt-4 border-t border-slate-100">

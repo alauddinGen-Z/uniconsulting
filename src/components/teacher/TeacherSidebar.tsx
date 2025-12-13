@@ -10,6 +10,7 @@ import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
 import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 import { ACTIVE_THEME } from "@/lib/theme-config";
+import { useLanguage } from "@/lib/i18n";
 
 interface TeacherSidebarProps {
     activeTab: string;
@@ -26,6 +27,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
     const router = useRouter();
     const supabase = createClient();
     const { unreadCount } = useUnreadMessageCount();
+    const { t } = useLanguage();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -64,13 +66,13 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
     };
 
     const navItems = [
-        { id: 'dashboard', label: 'Command Center', icon: LayoutGrid },
-        { id: 'students', label: 'All Students', icon: Users },
-        { id: 'ai-matcher', label: 'AI Matcher', icon: Sparkles, hasAI: true },
-        { id: 'messages', label: 'Messages', icon: MessageCircle },
-        { id: 'automation', label: 'Automation', icon: Zap },
+        { id: 'dashboard', label: t('nav.command_center'), icon: LayoutGrid },
+        { id: 'students', label: t('nav.students'), icon: Users },
+        { id: 'ai-matcher', label: t('nav.ai_matcher'), icon: Sparkles, hasAI: true },
+        { id: 'messages', label: t('nav.messages'), icon: MessageCircle },
+        { id: 'automation', label: t('nav.automation'), icon: Zap },
         // Admin Panel - only shown for admin users
-        ...(profile?.is_admin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield, isAdmin: true }] : []),
+        ...(profile?.is_admin ? [{ id: 'admin', label: t('nav.admin'), icon: Shield, isAdmin: true }] : []),
     ];
 
     return (
@@ -105,7 +107,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 space-y-2 py-4">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">Menu</div>
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2">{t("nav.menu")}</div>
                     {navItems.map((item) => (
                         <button
                             key={item.id}
@@ -171,7 +173,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                         onClick={() => setShowLogoutConfirm(true)}
                         className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700/50 hover:border-red-500/30 transition-all text-xs font-medium"
                     >
-                        <LogOut className="w-3.5 h-3.5" /> Sign Out
+                        <LogOut className="w-3.5 h-3.5" /> {t("action.sign_out")}
                     </button>
                 </div>
             </div>
