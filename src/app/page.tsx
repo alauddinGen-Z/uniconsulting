@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
-import { ArrowRight, GraduationCap, Users, Upload, Brain, Target, Shield, Zap, Sparkles, ChevronDown, Check, Play, Pause } from "lucide-react";
+import { ArrowRight, GraduationCap, Users, Upload, Brain, Target, Shield, Zap, Sparkles, ChevronDown, Check, Play, Pause, Monitor, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -100,6 +100,14 @@ export default function Home() {
           <Link href="/login" className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-xl shadow-orange-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
             Start Application <ArrowRight className="w-5 h-5" />
           </Link>
+          <a
+            href="https://github.com/alauddinGen-Z/uniconsulting/releases/latest/download/UniConsulting-Setup-1.0.0.exe"
+            className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-full font-bold text-lg shadow-xl shadow-slate-900/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-slate-700"
+          >
+            <Monitor className="w-5 h-5" />
+            Download for Windows
+            <Download className="w-4 h-4 opacity-60" />
+          </a>
         </motion.div>
 
         <motion.div
