@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { MessageCircle, Users, User, Send, Loader2, Plus, Search, ArrowLeft, Bell, X, Check } from "lucide-react";
+import { MessageCircle, Users, User, Send, Loader2, Plus, Search, ArrowLeft, Bell, X, Check, Mic, MicOff } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
@@ -54,6 +54,11 @@ export default function ChatView({ userRole }: Props) {
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [groupName, setGroupName] = useState("");
 
+    // Voice-to-Text State (Web Speech API)
+    const [isListening, setIsListening] = useState(false);
+    const [speechSupported, setSpeechSupported] = useState(false);
+    const recognitionRef = useRef<any>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const supabase = createClient();
 
@@ -73,6 +78,29 @@ export default function ChatView({ userRole }: Props) {
 
     useEffect(() => {
         initializeChat();
+        // Check for Web Speech API support
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            setSpeechSupported(true);
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = false;
+            recognitionRef.current.interimResults = false;
+            recognitionRef.current.lang = 'en-US';
+
+            recognitionRef.current.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setNewMessage(prev => prev + (prev ? ' ' : '') + transcript);
+                setIsListening(false);
+            };
+
+            recognitionRef.current.onerror = () => {
+                setIsListening(false);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsListening(false);
+            };
+        }
     }, []);
 
     useEffect(() => {
@@ -590,15 +618,35 @@ export default function ChatView({ userRole }: Props) {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Message Input */}
                         <div className="p-4 border-t border-slate-100 bg-white">
                             <div className="flex items-center gap-2">
+                                {/* Voice-to-Text Button (Accessibility) */}
+                                {speechSupported && (
+                                    <button
+                                        onClick={() => {
+                                            if (isListening) {
+                                                recognitionRef.current?.stop();
+                                                setIsListening(false);
+                                            } else {
+                                                recognitionRef.current?.start();
+                                                setIsListening(true);
+                                            }
+                                        }}
+                                        className={`p-3 rounded-xl transition-colors ${isListening
+                                                ? 'bg-red-500 text-white animate-pulse'
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                            }`}
+                                        title={isListening ? 'Stop listening' : 'Voice input'}
+                                    >
+                                        {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                                    </button>
+                                )}
                                 <input
                                     type="text"
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                                    placeholder="Type a message..."
+                                    placeholder={isListening ? "Listening..." : "Type a message..."}
                                     className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
                                 />
                                 <button

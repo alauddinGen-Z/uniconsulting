@@ -20,10 +20,36 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         const filledFields = fields.filter(f => profile?.[f as keyof typeof profile]);
         const completion = Math.round((filledFields.length / fields.length) * 100);
 
+        // ============================================
+        // GAMIFICATION: Application Completeness Score
+        // Weighted calculation for hackathon MVP
+        // ============================================
+        const profileFields = ['full_name', 'email', 'phone', 'home_address'];
+        const profileFilled = profileFields.filter(f => profile?.[f as keyof typeof profile]).length;
+        const profileScore = profileFilled >= 3 ? 20 : Math.round((profileFilled / 3) * 20); // 20%
+
+        const familyFields = ['father_name', 'mother_name', 'parent_phone'];
+        const familyFilled = familyFields.filter(f => profile?.[f as keyof typeof profile]).length;
+        const familyScore = familyFilled >= 2 ? 20 : Math.round((familyFilled / 2) * 20); // 20%
+
+        const documentsScore = documents.length >= 3 ? 30 : Math.round((documents.length / 3) * 30); // 30%
+
+        const essaysScore = essays.length >= 1 ? 30 : 0; // 30%
+
+        const applicationCompleteness = profileScore + familyScore + documentsScore + essaysScore;
+
         return {
             documents: documents.length,
             essays: essays.length,
-            profileComplete: completion
+            profileComplete: completion,
+            // Application Completeness Segments
+            applicationCompleteness,
+            segments: {
+                profile: profileScore,
+                family: familyScore,
+                documents: documentsScore,
+                essays: essaysScore
+            }
         };
     }, [profile, documents, essays]);
 
@@ -92,6 +118,66 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                     </div>
                 </div>
             </div>
+
+            {/* ============================================ */}
+            {/* GAMIFICATION: Application Completeness Bar */}
+            {/* ============================================ */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-orange-100 to-pink-100">
+                            <Target className="w-5 h-5 text-orange-500" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-slate-900">Application Completeness</h3>
+                            <p className="text-xs text-slate-400">Complete all sections to maximize your application</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-3xl font-black text-orange-500">{stats.applicationCompleteness}%</span>
+                    </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden mb-4">
+                    <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${stats.applicationCompleteness}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 via-pink-500 to-purple-500 rounded-full"
+                    />
+                </div>
+
+                {/* Segment Indicators */}
+                <div className="grid grid-cols-4 gap-2">
+                    {[
+                        { label: 'Profile', value: stats.segments.profile, max: 20, color: 'blue' },
+                        { label: 'Family', value: stats.segments.family, max: 20, color: 'purple' },
+                        { label: 'Documents', value: stats.segments.documents, max: 30, color: 'orange' },
+                        { label: 'Essays', value: stats.segments.essays, max: 30, color: 'emerald' },
+                    ].map((seg, i) => (
+                        <div key={i} className="text-center">
+                            <div className={`h-2 rounded-full mb-2 ${seg.value >= seg.max ? 'bg-emerald-400' : 'bg-slate-200'}`}>
+                                <div
+                                    className={`h-full rounded-full transition-all duration-500 ${seg.value >= seg.max
+                                            ? 'bg-emerald-400 w-full'
+                                            : `bg-${seg.color}-400`
+                                        }`}
+                                    style={{ width: `${(seg.value / seg.max) * 100}%` }}
+                                />
+                            </div>
+                            <p className="text-xs font-medium text-slate-500">{seg.label}</p>
+                            <p className={`text-xs font-bold ${seg.value >= seg.max ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                {seg.value}/{seg.max}%
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
 
             {/* Status Ticket */}
             {!(profile?.approval_status === 'approved' && dismissedApprovalBanner) && (
