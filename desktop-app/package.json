@@ -15,13 +15,14 @@
         "dev": "set ELECTRON_DEV=true && electron .",
         "build": "electron-builder",
         "build-python": "node build-engine.js",
+        "download-python": "node scripts/download-python.js",
         "build-frontend": "cd .. && npm run build:export && xcopy /E /I /Y out ..\\desktop-app\\frontend",
         "dist": "npm run build-python && npm run build",
         "dist:win": "electron-builder --win",
         "dist:mac": "electron-builder --mac",
         "dist:linux": "electron-builder --linux",
         "build:student": "npm run build-frontend && electron-builder -c electron-builder-student.yml --win",
-        "build:teacher": "npm run build-python && npm run build-frontend && electron-builder -c electron-builder-teacher.yml --win"
+        "build:teacher": "npm run download-python && npm run build-python && npm run build-frontend && electron-builder -c electron-builder-teacher.yml --win"
     },
     "dependencies": {
         "electron-store": "^8.1.0",

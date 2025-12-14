@@ -30,6 +30,11 @@ extraResources:
       - agent.py
       - requirements.txt
       - "*.py"
+  # Include portable Python (for machines without Python installed)
+  - from: python-embedded
+    to: python-embedded
+    filter:
+      - "**/*"
 
 protocols:
   - name: UniConsulting Teacher

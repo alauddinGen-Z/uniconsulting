@@ -5,6 +5,8 @@ node_modules/
 dist/
 python/build/
 python/dist/
+python-embedded/
+automation-service/venv/
 
 # Logs
 *.log
