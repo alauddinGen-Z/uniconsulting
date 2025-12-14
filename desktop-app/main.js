@@ -559,6 +559,186 @@ async function runEngine(studentData) {
 }
 
 // ============================================================================
+// Browser-Use Automation Service Management
+// ============================================================================
+
+let automationServiceProcess = null;
+const AUTOMATION_SERVICE_PORT = 8765;
+
+function getAutomationServicePath() {
+    if (isDev) {
+        return path.join(__dirname, 'automation-service');
+    } else {
+        return path.join(process.resourcesPath, 'automation-service');
+    }
+}
+
+function getPythonPath() {
+    if (isDev) {
+        // In development, use system Python
+        return 'python';
+    } else {
+        // In production, use bundled Python
+        const bundledPython = path.join(process.resourcesPath, 'python-embedded', 'python.exe');
+        const fs = require('fs');
+        if (fs.existsSync(bundledPython)) {
+            return bundledPython;
+        }
+        // Fallback to system Python if bundled not found
+        return 'python';
+    }
+}
+
+async function checkAutomationServiceInstalled() {
+    const servicePath = getAutomationServicePath();
+    const venvPath = path.join(servicePath, 'venv');
+    const fs = require('fs');
+    return fs.existsSync(venvPath);
+}
+
+async function installAutomationDependencies() {
+    const servicePath = getAutomationServicePath();
+    const pythonPath = getPythonPath();
+    const fs = require('fs');
+
+    log('Installing automation service dependencies...');
+
+    // Update splash to show install progress
+    updateSplashStatus('Installing automation engine...', true, 30);
+
+    return new Promise((resolve, reject) => {
+        const venvPath = path.join(servicePath, 'venv');
+
+        // Create venv
+        const createVenv = spawn(pythonPath, ['-m', 'venv', venvPath], { cwd: servicePath });
+
+        createVenv.on('close', (code) => {
+            if (code !== 0) {
+                log('Failed to create venv');
+                resolve(false);
+                return;
+            }
+
+            updateSplashStatus('Installing dependencies...', true, 50);
+
+            // Install requirements
+            const pipPath = process.platform === 'win32'
+                ? path.join(venvPath, 'Scripts', 'pip.exe')
+                : path.join(venvPath, 'bin', 'pip');
+
+            const requirementsPath = path.join(servicePath, 'requirements.txt');
+
+            if (!fs.existsSync(requirementsPath)) {
+                log('requirements.txt not found');
+                resolve(false);
+                return;
+            }
+
+            const installDeps = spawn(pipPath, ['install', '-r', requirementsPath], { cwd: servicePath });
+
+            installDeps.stdout.on('data', (data) => {
+                log(`[pip]: ${data.toString().trim()}`);
+            });
+
+            installDeps.stderr.on('data', (data) => {
+                log(`[pip error]: ${data.toString().trim()}`);
+            });
+
+            installDeps.on('close', (code) => {
+                if (code === 0) {
+                    log('Dependencies installed successfully');
+                    updateSplashStatus('Automation ready!', true, 100);
+                    resolve(true);
+                } else {
+                    log('Failed to install dependencies');
+                    resolve(false);
+                }
+            });
+        });
+    });
+}
+
+async function startAutomationService() {
+    if (automationServiceProcess) {
+        log('Automation service already running');
+        return true;
+    }
+
+    const servicePath = getAutomationServicePath();
+    const fs = require('fs');
+
+    // Check if service files exist
+    const mainPyPath = path.join(servicePath, 'main.py');
+    if (!fs.existsSync(mainPyPath)) {
+        log('Automation service main.py not found - skipping');
+        return false;
+    }
+
+    // Check if dependencies are installed
+    const isInstalled = await checkAutomationServiceInstalled();
+    if (!isInstalled) {
+        const installed = await installAutomationDependencies();
+        if (!installed) {
+            log('Failed to install automation dependencies');
+            return false;
+        }
+    }
+
+    const venvPath = path.join(servicePath, 'venv');
+    const pythonExe = process.platform === 'win32'
+        ? path.join(venvPath, 'Scripts', 'python.exe')
+        : path.join(venvPath, 'bin', 'python');
+
+    log(`Starting automation service at port ${AUTOMATION_SERVICE_PORT}...`);
+
+    automationServiceProcess = spawn(pythonExe, [mainPyPath], {
+        cwd: servicePath,
+        env: {
+            ...process.env,
+            PYTHONUNBUFFERED: '1',
+        },
+        detached: false,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    automationServiceProcess.stdout.on('data', (data) => {
+        log(`[AutoService]: ${data.toString().trim()}`);
+    });
+
+    automationServiceProcess.stderr.on('data', (data) => {
+        log(`[AutoService Error]: ${data.toString().trim()}`);
+    });
+
+    automationServiceProcess.on('close', (code) => {
+        log(`Automation service exited with code ${code}`);
+        automationServiceProcess = null;
+    });
+
+    automationServiceProcess.on('error', (err) => {
+        log(`Automation service error: ${err.message}`);
+        automationServiceProcess = null;
+    });
+
+    // Wait a moment for the service to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    log('Automation service started');
+    return true;
+}
+
+function stopAutomationService() {
+    if (automationServiceProcess) {
+        log('Stopping automation service...');
+        if (process.platform === 'win32') {
+            spawn('taskkill', ['/pid', automationServiceProcess.pid, '/f', '/t']);
+        } else {
+            automationServiceProcess.kill('SIGTERM');
+        }
+        automationServiceProcess = null;
+    }
+}
+
+// ============================================================================
 // IPC Handlers
 // ============================================================================
 
@@ -748,6 +928,13 @@ app.whenReady().then(async () => {
         log('Local server failed, falling back to remote URL');
     }
 
+    // Step 0.5: Start automation service (browser-use)
+    try {
+        await startAutomationService();
+    } catch (err) {
+        log('Automation service failed to start: ' + err.message);
+    }
+
     // Step 1: Show splash screen immediately
     createSplashWindow();
 
@@ -770,6 +957,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     killEngine();
+    stopAutomationService();
 });
 
 // Handle deep link from app startup (Windows)

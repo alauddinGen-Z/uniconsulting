@@ -22,6 +22,14 @@ extraResources:
     to: engine
     filter:
       - "**/*"
+  # Include browser-use automation service
+  - from: automation-service
+    to: automation-service
+    filter:
+      - main.py
+      - agent.py
+      - requirements.txt
+      - "*.py"
 
 protocols:
   - name: UniConsulting Teacher
