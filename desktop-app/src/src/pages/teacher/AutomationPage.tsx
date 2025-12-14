@@ -3,8 +3,9 @@ import { useAppStore } from '../../store/appStore';
 import { supabase } from '../../lib/supabase';
 import {
     Search, Loader2, Copy, Check, User, Phone, Mail, Home, FileText,
-    Users, GraduationCap, ArrowRight, Clipboard, Download, File, Zap, Calendar, MapPin
+    Users, GraduationCap, ArrowRight, Clipboard, Download, File, Zap, Calendar, MapPin, Bot
 } from 'lucide-react';
+import AutoApplyPanel from '../../components/AutoApplyPanel';
 
 interface Student {
     id: string;
@@ -85,6 +86,7 @@ export default function AutomationPage() {
     const [essays, setEssays] = useState<Essay[]>([]);
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'copy' | 'autoapply'>('copy');
 
     useEffect(() => {
         loadStudents();
@@ -210,14 +212,40 @@ ${profileData.city || ''} ${profileData.country || ''}`;
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center">
-                    <Zap className="w-7 h-7 text-orange-600" />
+            {/* Header with Tabs */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center">
+                        <Zap className="w-7 h-7 text-orange-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Automation Hub</h1>
+                        <p className="text-slate-500">Copy data or auto-apply to universities</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Automation Hub</h1>
-                    <p className="text-slate-500">Copy student data and fill forms efficiently</p>
+
+                {/* Tab Switcher */}
+                <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                    <button
+                        onClick={() => setActiveTab('copy')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'copy'
+                            ? 'bg-white text-orange-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                    >
+                        <Clipboard className="w-4 h-4 inline-block mr-2" />
+                        Copy Data
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('autoapply')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'autoapply'
+                            ? 'bg-white text-purple-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                    >
+                        <Bot className="w-4 h-4 inline-block mr-2" />
+                        Auto-Apply
+                    </button>
                 </div>
             </div>
 
@@ -287,9 +315,11 @@ ${profileData.city || ''} ${profileData.country || ''}`;
                     </div>
                 </div>
 
-                {/* Right Panel - Data Display */}
+                {/* Right Panel - Data Display or Auto-Apply */}
                 <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
-                    {!selectedStudentId ? (
+                    {activeTab === 'autoapply' ? (
+                        <AutoApplyPanel studentData={profileData ? { id: selectedStudentId || '', ...profileData } : null} />
+                    ) : !selectedStudentId ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
                             <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                                 <Clipboard className="w-8 h-8 opacity-30" />

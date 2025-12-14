@@ -13,6 +13,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
 });
 
+// Gemini API Key for browser-use automation
+export const GEMINI_API_KEY = 'AIzaSyDubPlaFy0VC9gvApftXH1d2ZpyfB03F-g';
+
 console.log('[Supabase] Client initialized with URL:', supabaseUrl);
 
 export default supabase;
