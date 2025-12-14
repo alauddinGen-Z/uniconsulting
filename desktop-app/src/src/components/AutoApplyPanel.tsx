@@ -8,7 +8,7 @@ import {
     Bot, Play, CheckCircle, AlertCircle, Key,
     ExternalLink, Loader2, GraduationCap
 } from 'lucide-react';
-import { GEMINI_API_KEY } from '../lib/supabase';
+import { getGeminiApiKey } from '../lib/supabase';
 
 const AUTOMATION_SERVICE_URL = 'http://127.0.0.1:8765';
 
@@ -48,7 +48,7 @@ export default function AutoApplyPanel({ studentData }: AutoApplyPanelProps) {
     const [automationProgress, setAutomationProgress] = useState<AutomationProgress | null>(null);
     const [automationTaskId, setAutomationTaskId] = useState<string | null>(null);
     // Use configured API key by default
-    const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || GEMINI_API_KEY);
+    const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || getGeminiApiKey());
     const [showApiKeyInput, setShowApiKeyInput] = useState(false);
     const [serviceStatus, setServiceStatus] = useState<'unknown' | 'running' | 'stopped'>('unknown');
     const wsRef = useRef<WebSocket | null>(null);

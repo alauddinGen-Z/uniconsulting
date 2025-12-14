@@ -13,9 +13,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
 });
 
-// Gemini API Key for browser-use automation
-export const GEMINI_API_KEY = 'AIzaSyDubPlaFy0VC9gvApftXH1d2ZpyfB03F-g';
+// Gemini API Key - should be set via UI settings (stored in localStorage)
+// DO NOT HARDCODE API KEYS HERE
+export const getGeminiApiKey = () => {
+    if (typeof window !== 'undefined') {
+        return localStorage.getItem('gemini_api_key') || '';
+    }
+    return '';
+};
 
 console.log('[Supabase] Client initialized with URL:', supabaseUrl);
 
 export default supabase;
+
