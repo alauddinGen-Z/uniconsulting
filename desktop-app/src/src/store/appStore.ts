@@ -85,18 +85,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Load user profile
     loadUserProfile: async () => {
+        console.log('[AppStore] Starting loadUserProfile...');
         try {
-            const { data: { user: authUser } } = await supabase.auth.getUser();
+            // Add timeout to prevent infinite waiting
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Auth timeout')), 10000)
+            );
+
+            const authPromise = supabase.auth.getUser();
+            const { data: { user: authUser } } = await Promise.race([authPromise, timeoutPromise]) as Awaited<typeof authPromise>;
+
+            console.log('[AppStore] Auth user:', authUser?.id || 'none');
+
             if (!authUser) {
+                console.log('[AppStore] No auth user, setting unauthenticated');
                 set({ user: null, isAuthenticated: false, isLoading: false });
                 return;
             }
 
-            const { data: profile } = await supabase
+            const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', authUser.id)
                 .single();
+
+            console.log('[AppStore] Profile loaded:', profile?.id, 'Error:', error?.message);
 
             set({
                 user: profile,
@@ -104,8 +117,8 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isLoading: false
             });
         } catch (error) {
-            console.error('Error loading profile:', error);
-            set({ isLoading: false });
+            console.error('[AppStore] Error loading profile:', error);
+            set({ user: null, isAuthenticated: false, isLoading: false });
         }
     },
 
