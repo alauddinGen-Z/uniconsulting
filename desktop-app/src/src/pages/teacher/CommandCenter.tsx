@@ -4,6 +4,8 @@ import { Users, Clock, CheckCircle, XCircle } from 'lucide-react';
 export default function CommandCenter() {
     const { students } = useAppStore();
 
+    console.log('[CommandCenter] Rendering, students count:', students.length);
+
     const stats = {
         total: students.length,
         pending: students.filter(s => s.approval_status === 'pending').length,

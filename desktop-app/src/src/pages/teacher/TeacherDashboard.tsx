@@ -23,6 +23,8 @@ export default function TeacherDashboard() {
     const { user, students, messages, logout } = useAppStore();
     const navigate = useNavigate();
 
+    console.log('[TeacherDashboard] Rendering, user:', user?.email, 'students:', students.length);
+
     // Count unread messages
     const unreadCount = messages.filter(m => m.receiver_id === user?.id && !m.is_read).length;
     // Count pending students

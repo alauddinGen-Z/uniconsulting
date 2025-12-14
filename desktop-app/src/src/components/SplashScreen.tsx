@@ -1,8 +1,18 @@
+import { supabase } from '../lib/supabase';
+
 interface SplashScreenProps {
     message?: string;
+    showLogout?: boolean;
 }
 
-export default function SplashScreen({ message = "Loading..." }: SplashScreenProps) {
+export default function SplashScreen({ message = "Loading...", showLogout = false }: SplashScreenProps) {
+    const handleEmergencyLogout = async () => {
+        console.log('[SplashScreen] Emergency logout...');
+        await supabase.auth.signOut();
+        localStorage.clear();
+        window.location.reload();
+    };
+
     return (
         <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-pink-500 flex flex-col items-center justify-center">
             {/* Logo */}
@@ -20,6 +30,17 @@ export default function SplashScreen({ message = "Loading..." }: SplashScreenPro
             <div className="mt-6">
                 <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
             </div>
+
+            {/* Emergency Logout Button */}
+            {showLogout && (
+                <button
+                    onClick={handleEmergencyLogout}
+                    className="mt-8 px-6 py-2 bg-white/20 hover:bg-white/30 text-white text-sm rounded-lg transition"
+                >
+                    Sign Out
+                </button>
+            )}
         </div>
     );
 }
+
