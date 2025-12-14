@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Stats {
     totalStudents: number;
@@ -52,19 +53,21 @@ const formatTimeAgo = (date: Date): string => {
 
 export default function TeacherHomeDashboard() {
     const supabase = createClient();
+    const { user: authUser, isLoading: authLoading } = useAuth();
 
     // React Query for dashboard data - instant on tab switch!
     const { data: dashboardData, isLoading } = useQuery({
-        queryKey: ['teacher', 'dashboard'],
+        queryKey: ['teacher', 'dashboard', authUser?.id],
         queryFn: async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not authenticated");
+            // Use the authUser from context instead of fetching again
+            if (!authUser) throw new Error("Not authenticated");
+            const userId = authUser.id;
 
             // Fetch student stats
             const { data: students } = await supabase
                 .from('profiles')
                 .select('id, full_name, approval_status, created_at')
-                .eq('teacher_id', user.id)
+                .eq('teacher_id', userId)
                 .eq('role', 'student');
 
             const totalStudents = students?.length || 0;
@@ -163,6 +166,7 @@ export default function TeacherHomeDashboard() {
                 deadlines
             };
         },
+        enabled: !!authUser && !authLoading, // Only run when authenticated
         staleTime: 5 * 60 * 1000, // 5 minutes - instant on tab switch
     });
 
@@ -199,7 +203,7 @@ export default function TeacherHomeDashboard() {
         }
     };
 
-    if (isLoading) {
+    if (isLoading || authLoading) {
         return (
             <div className="flex items-center justify-center h-full">
                 <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" />

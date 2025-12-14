@@ -156,4 +156,14 @@ contextBridge.exposeInMainWorld('electron', {
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });
 
+// Also expose as electronAPI for compatibility
+contextBridge.exposeInMainWorld('electronAPI', {
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    onAuthSuccess: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('auth-success', handler);
+        return () => ipcRenderer.removeListener('auth-success', handler);
+    },
+});
+
 console.log('[Preload] UniConsulting Desktop bridge initialized');

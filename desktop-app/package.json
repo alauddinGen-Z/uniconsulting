@@ -36,6 +36,7 @@
         "appId": "com.uniconsulting.desktop",
         "productName": "UniConsulting",
         "copyright": "Copyright © 2024 UniConsulting",
+        "asar": false,
         "directories": {
             "output": "dist",
             "buildResources": "assets"
@@ -45,7 +46,7 @@
             "preload.js",
             "splash.html",
             "index.html",
-            "frontend/**/*"
+            "dist-react/**/*"
         ],
         "extraResources": [
             {

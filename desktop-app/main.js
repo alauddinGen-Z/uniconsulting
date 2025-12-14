@@ -14,7 +14,7 @@
  * @file desktop-app/main.js
  */
 
-const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, session, Tray, nativeImage } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -26,25 +26,113 @@ const PROTOCOL_SCHEME = 'uniconsulting';
 const isDev = process.env.ELECTRON_DEV === 'true';
 const APP_MODE = process.env.APP_MODE || 'teacher'; // 'student' or 'teacher'
 
-// Check if we have bundled frontend (offline mode)
-const hasBundledFrontend = require('fs').existsSync(path.join(__dirname, 'frontend', 'index.html'));
+// Check if we have bundled frontend (standalone React app)
+const hasBundledFrontend = require('fs').existsSync(path.join(__dirname, 'dist-react', 'index.html'));
 
 // URLs for remote mode (fallback)
 const BASE_URL = isDev
     ? 'http://localhost:3000'
     : 'https://uniconsulting.netlify.app';
 
+// Local server port for bundled frontend
+let LOCAL_SERVER_PORT = 3001;
+let localServerUrl = `http://localhost:${LOCAL_SERVER_PORT}`;
+
+// ============================================================================
+// Local HTTP Server for Bundled Frontend
+// ============================================================================
+
+let localServer = null;
+
+function startLocalServer() {
+    if (!hasBundledFrontend || isDev) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+        const http = require('http');
+        const fs = require('fs');
+        const url = require('url');
+
+        const frontendPath = path.join(__dirname, 'dist-react');
+
+        // MIME types for static files
+        const mimeTypes = {
+            '.html': 'text/html',
+            '.js': 'text/javascript',
+            '.css': 'text/css',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.ico': 'image/x-icon',
+            '.woff': 'font/woff',
+            '.woff2': 'font/woff2',
+            '.ttf': 'font/ttf',
+            '.txt': 'text/plain',
+        };
+
+        localServer = http.createServer((req, res) => {
+            let pathname = url.parse(req.url).pathname;
+
+            // SPA routing: serve index.html for all non-asset routes
+            if (pathname === '/') pathname = '/index.html';
+            // Check if it's an asset request (has extension)
+            const hasExt = path.extname(pathname) !== '';
+
+            const filePath = path.join(frontendPath, pathname);
+            const ext = path.extname(filePath).toLowerCase();
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+            fs.readFile(filePath, (err, content) => {
+                if (err) {
+                    // SPA fallback: if not an asset, serve index.html
+                    if (!hasExt || pathname.endsWith('.html')) {
+                        const indexPath = path.join(frontendPath, 'index.html');
+                        fs.readFile(indexPath, (err2, content2) => {
+                            if (err2) {
+                                res.writeHead(404);
+                                res.end('Not found');
+                            } else {
+                                res.writeHead(200, { 'Content-Type': 'text/html' });
+                                res.end(content2);
+                            }
+                        });
+                    } else {
+                        res.writeHead(404);
+                        res.end('Not found');
+                    }
+                } else {
+                    res.writeHead(200, { 'Content-Type': contentType });
+                    res.end(content);
+                }
+            });
+        });
+
+        localServer.listen(LOCAL_SERVER_PORT, '127.0.0.1', () => {
+            console.log(`[Main] Local server started at ${localServerUrl}`);
+            resolve();
+        });
+
+        localServer.on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                // Port in use, try next port
+                LOCAL_SERVER_PORT++;
+                localServerUrl = `http://localhost:${LOCAL_SERVER_PORT}`;
+                localServer.listen(LOCAL_SERVER_PORT, '127.0.0.1');
+            } else {
+                console.error('[Main] Local server error:', err);
+                reject(err);
+            }
+        });
+    });
+}
+
 // Determine start URL based on mode and bundled frontend
 function getStartUrl(isLoggedIn) {
     if (hasBundledFrontend && !isDev) {
-        // Offline mode: load from local files
-        const basePath = path.join(__dirname, 'frontend');
-        if (isLoggedIn) {
-            return APP_MODE === 'student'
-                ? `file://${path.join(basePath, 'student', 'home', 'index.html')}`
-                : `file://${path.join(basePath, 'teacher', 'home', 'index.html')}`;
-        }
-        return `file://${path.join(basePath, 'login', 'index.html')}`;
+        // Standalone SPA mode: React Router handles all routing 
+        // Always load root, the app will redirect as needed
+        return localServerUrl;
     }
 
     // Online mode: load from remote URL
@@ -139,13 +227,14 @@ if (!gotTheLock) {
     app.quit();
 } else {
     app.on('second-instance', (event, commandLine, workingDirectory) => {
-        log('Second instance detected');
+        log('Second instance detected - showing existing window');
         const deepLinkUrl = commandLine.find(arg => arg.startsWith(`${PROTOCOL_SCHEME}://`));
         if (deepLinkUrl) {
             log(`Deep link received: ${deepLinkUrl}`);
             handleDeepLink(deepLinkUrl);
         }
         if (mainWindow) {
+            mainWindow.show(); // Show hidden window
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
         }
@@ -252,8 +341,8 @@ function createMainWindow() {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true,
-            webSecurity: !isDev,
+            sandbox: false, // Disabled for external API access (Supabase)
+            webSecurity: false, // Allow cross-origin requests to Supabase
         },
     });
 
@@ -294,6 +383,15 @@ function createMainWindow() {
         }
         shell.openExternal(url);
         return { action: 'deny' };
+    });
+
+    // Minimize to tray on close (instead of quitting)
+    mainWindow.on('close', (event) => {
+        if (!app.isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+            return false;
+        }
     });
 
     mainWindow.on('closed', () => {
@@ -552,8 +650,103 @@ ipcMain.handle('open-external', async (event, url) => {
 // App Lifecycle - Discord-Style Startup
 // ============================================================================
 
-app.whenReady().then(() => {
+// System tray for "Show hidden icons"
+let tray = null;
+
+app.whenReady().then(async () => {
     log('UniConsulting Desktop starting...');
+
+    // Enable CORS bypass for Supabase API
+    session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+        callback({ requestHeaders: { ...details.requestHeaders } });
+    });
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+            responseHeaders: {
+                ...details.responseHeaders,
+                'Access-Control-Allow-Origin': ['*'],
+                'Access-Control-Allow-Headers': ['*'],
+                'Access-Control-Allow-Methods': ['*']
+            }
+        });
+    });
+    log('CORS bypass enabled for API requests');
+
+    // Create system tray icon (appears in "Show hidden icons")
+    try {
+        const fs = require('fs');
+        // Try multiple paths for the icon
+        const iconPaths = [
+            path.join(__dirname, 'assets', 'icon.ico'),
+            path.join(__dirname, 'assets', 'icons', 'win', 'icon.ico'),
+            path.join(__dirname, 'assets', 'icon.png'),
+        ];
+
+        let trayIcon = null;
+        for (const iconPath of iconPaths) {
+            if (fs.existsSync(iconPath)) {
+                log(`Loading tray icon from: ${iconPath}`);
+                trayIcon = nativeImage.createFromPath(iconPath);
+                if (!trayIcon.isEmpty()) break;
+            }
+        }
+
+        if (!trayIcon || trayIcon.isEmpty()) {
+            log('No tray icon found, using default app icon');
+            // Try to use the app exe icon as fallback
+            trayIcon = app.getFileIcon ? app.getFileIcon(process.execPath) : null;
+        }
+
+        if (trayIcon && !trayIcon.isEmpty()) {
+            tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
+            tray.setToolTip('UniConsulting - Click to show');
+            const trayMenu = Menu.buildFromTemplate([
+                {
+                    label: 'Show UniConsulting',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.show();
+                            mainWindow.focus();
+                        }
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Quit',
+                    click: () => {
+                        app.isQuitting = true;
+                        app.quit();
+                    }
+                }
+            ]);
+            tray.setContextMenu(trayMenu);
+            tray.on('click', () => {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            });
+            tray.on('double-click', () => {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            });
+            log('System tray icon created successfully');
+        } else {
+            log('Warning: Could not create tray icon - no valid icon found');
+        }
+    } catch (err) {
+        console.error('[Main] Failed to create tray icon:', err);
+    }
+
+    // Step 0: Start local HTTP server for bundled frontend (before anything else)
+    try {
+        await startLocalServer();
+        log(`Local server ready at ${localServerUrl}`);
+    } catch (err) {
+        log('Local server failed, falling back to remote URL');
+    }
 
     // Step 1: Show splash screen immediately
     createSplashWindow();
