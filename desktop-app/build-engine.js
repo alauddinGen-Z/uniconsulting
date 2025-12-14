@@ -75,7 +75,7 @@ async function main() {
     log('');
     log('[3/4] Installing Playwright browsers...');
     try {
-        await runCommand('playwright', ['install', 'chromium'], PYTHON_DIR);
+        await runCommand('python', ['-m', 'playwright', 'install', 'chromium'], PYTHON_DIR);
     } catch (error) {
         log(`Warning: Playwright install failed - ${error.message}`);
         log('Browser automation may not work without Playwright browsers');
@@ -85,7 +85,8 @@ async function main() {
     log('');
     log('[4/4] Building executable with PyInstaller...');
     try {
-        await runCommand('pyinstaller', [
+        await runCommand('python', [
+            '-m', 'PyInstaller',
             '--onedir',
             '--name=engine',
             '--distpath=dist',
