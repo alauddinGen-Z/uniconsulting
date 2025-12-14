@@ -24,12 +24,25 @@ function App() {
   // Preload all data when user is authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      Promise.all([
-        loadStudents(),
-        loadMessages()
-      ]).then(() => {
-        setIsDataLoaded(true);
-      });
+      const loadData = async () => {
+        try {
+          // Add timeout to prevent infinite loading
+          const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 10000)
+          );
+
+          await Promise.race([
+            Promise.all([loadStudents(), loadMessages()]),
+            timeout
+          ]);
+        } catch (error) {
+          console.error('Error loading data:', error);
+        } finally {
+          // Always mark as loaded, even on error
+          setIsDataLoaded(true);
+        }
+      };
+      loadData();
     }
   }, [isAuthenticated, user, loadStudents, loadMessages]);
 
