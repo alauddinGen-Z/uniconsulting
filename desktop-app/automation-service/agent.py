@@ -133,7 +133,9 @@ class UniversityApplicationAgent:
         self,
         student_data: dict,
         university_name: str,
-        mode: Literal["semi", "full"]
+        mode: Literal["semi", "full"],
+        major: str | None = None,
+        custom_prompt: str | None = None
     ) -> dict:
         """
         Main method to apply to a university
@@ -142,6 +144,8 @@ class UniversityApplicationAgent:
             student_data: Student profile with all required fields
             university_name: Name of the university to apply to
             mode: "semi" for review before submit, "full" for auto-submit
+            major: Optional major/program to apply for
+            custom_prompt: Optional pre-built prompt from frontend
             
         Returns:
             Result dict with status and any account credentials created
@@ -168,8 +172,11 @@ class UniversityApplicationAgent:
             browser_config = get_persistent_browser_config()
             self.browser = Browser(config=browser_config)
             
-            # Build the task prompt with student data
-            task_prompt = self._build_task_prompt(student_data, university_name, mode)
+            # Use custom prompt if provided, otherwise build our own
+            if custom_prompt:
+                task_prompt = f"{SAFETY_SYSTEM_PROMPT}\n\n{custom_prompt}"
+            else:
+                task_prompt = self._build_task_prompt(student_data, university_name, mode)
             
             await self._update_progress("searching", 20, f"Searching for {university_name} application portal...")
             

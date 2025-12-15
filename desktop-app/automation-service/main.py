@@ -81,8 +81,10 @@ class ApplicationRequest(BaseModel):
     student_id: str
     student_data: dict  # Full student profile
     university_name: str
+    major: str | None = None  # Major/program to apply for
     mode: Literal["semi", "full"]  # semi = review before submit, full = auto submit
     gemini_api_key: str | None = None  # Optional, defaults to env var
+    custom_prompt: str | None = None  # Optional pre-built prompt from frontend
 
 
 class TaskStatus(BaseModel):
@@ -294,11 +296,13 @@ async def run_application_automation(task_id: str, request: ApplicationRequest, 
         
         await update_progress("searching", 10, f"Searching for {request.university_name} application portal...")
         
-        # Run the automation
+        # Run the automation with custom prompt if provided
         result = await agent.apply_to_university(
             student_data=request.student_data,
             university_name=request.university_name,
-            mode=request.mode
+            major=request.major,
+            mode=request.mode,
+            custom_prompt=request.custom_prompt
         )
         
         if result.get("account_created"):
