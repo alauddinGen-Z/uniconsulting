@@ -101,11 +101,16 @@ export default function LoginPage() {
                     const userRole = profile?.role || 'student';
                     toast.success(`Welcome, ${userRole}!`);
 
+                    // Reset loading state before navigation
+                    setIsLoading(false);
+
+                    // Use replace to prevent back-button returning to login
                     if (userRole === 'teacher') {
-                        router.push("/teacher/home");
+                        router.replace("/teacher/home");
                     } else {
-                        router.push("/student/home");
+                        router.replace("/student/home");
                     }
+                    return; // Exit early since we're navigating
                 } else {
                     // Email confirmation required
                     toast.success("Account created! Please check your email to verify.");
@@ -169,11 +174,16 @@ export default function LoginPage() {
                     }
                 }
 
+                // Reset loading state before navigation
+                setIsLoading(false);
+
+                // Use replace to prevent back-button returning to login
                 if (userRole === 'teacher') {
-                    router.push("/teacher/home");
+                    router.replace("/teacher/home");
                 } else {
-                    router.push("/student/home");
+                    router.replace("/student/home");
                 }
+                return; // Exit early since we're navigating
             }
         } catch (error: any) {
             toast.error(error.message || "Authentication failed");
