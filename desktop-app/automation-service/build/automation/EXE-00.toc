@@ -76,7 +76,7 @@
  [],
  False,
  False,
- 1765804736,
+ 1765838222,
  [('run.exe',
    'D:\\Project1\\uniconsulting\\uniconsulting\\desktop-app\\automation-service\\venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\run.exe',
    'EXECUTABLE')],

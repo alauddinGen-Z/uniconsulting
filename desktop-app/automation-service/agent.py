@@ -155,10 +155,10 @@ class UniversityApplicationAgent:
             }
         
         try:
-            # Initialize LLM with Gemini
-            llm = ChatGoogleGenerativeAI(
+            # Initialize LLM with browser-use's native ChatGoogle
+            llm = ChatGoogle(
                 model="gemini-2.0-flash-exp",
-                google_api_key=self.gemini_api_key,
+                api_key=self.gemini_api_key,
                 temperature=0.1  # Low temperature for accurate form filling
             )
             
@@ -337,9 +337,9 @@ Begin now.
         if self.agent and self.browser:
             try:
                 # Create a follow-up task to click submit
-                llm = ChatGoogleGenerativeAI(
+                llm = ChatGoogle(
                     model="gemini-2.0-flash-exp",
-                    google_api_key=self.gemini_api_key,
+                    api_key=self.gemini_api_key,
                     temperature=0.1
                 )
                 
@@ -356,7 +356,7 @@ Begin now.
     async def close(self):
         """Clean up browser resources"""
         if self.browser:
-            await self.browser.close()
+            await self.browser.stop()
 
 
 # =============================================================================
