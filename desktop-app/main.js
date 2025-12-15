@@ -1014,11 +1014,17 @@ app.whenReady().then(async () => {
         log('Local server failed, falling back to remote URL');
     }
 
-    // Step 0.5: Start automation service (browser-use)
-    try {
-        await startAutomationService();
-    } catch (err) {
-        log('Automation service failed to start: ' + err.message);
+    // Step 0.5: Start automation service (browser-use) - ONLY FOR TEACHER MODE
+    if (APP_MODE === 'teacher') {
+        try {
+            log('Starting automation service for teacher mode...');
+            await startAutomationService();
+            log('Automation service started automatically');
+        } catch (err) {
+            log('Automation service failed to start: ' + err.message);
+        }
+    } else {
+        log('Skipping automation service for student mode');
     }
 
     // Step 1: Show splash screen immediately
