@@ -1,7 +1,7 @@
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import {
-    LayoutDashboard, Users, MessageSquare, LogOut, Zap, Sparkles
+    LayoutDashboard, Users, MessageSquare, LogOut, Zap, Sparkles, Bot
 } from 'lucide-react';
 
 // Page components
@@ -10,6 +10,7 @@ import AllStudents from './AllStudents';
 import Messages from './Messages';
 import AIMatcherPage from './AIMatcherPage';
 import AutomationPage from './AutomationPage';
+import AIBrowserAutomationPage from './AIBrowserAutomationPage';
 
 const navItems = [
     { id: 'dashboard', path: '/', label: 'Command Center', icon: LayoutDashboard },
@@ -17,6 +18,7 @@ const navItems = [
     { id: 'messages', path: '/messages', label: 'Messages', icon: MessageSquare },
     { id: 'ai-matcher', path: '/ai-matcher', label: 'AI Matcher', icon: Sparkles },
     { id: 'automation', path: '/automation', label: 'Automation', icon: Zap },
+    { id: 'ai-browser', path: '/ai-automation', label: 'AI Browser', icon: Bot },
 ];
 
 export default function TeacherDashboard() {
@@ -113,6 +115,7 @@ export default function TeacherDashboard() {
                     <Route path="messages" element={<Messages />} />
                     <Route path="ai-matcher" element={<AIMatcherPage />} />
                     <Route path="automation" element={<AutomationPage />} />
+                    <Route path="ai-automation" element={<AIBrowserAutomationPage />} />
                 </Routes>
             </main>
         </div>

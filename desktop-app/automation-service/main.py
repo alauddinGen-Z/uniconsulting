@@ -1,19 +1,57 @@
 """
 Browser-Use Automation Service
 FastAPI server for university application automation
+
+ARCHITECTURAL MANDATES:
+- Port: 8765 (MANDATORY)
+- Non-blocking task execution via BackgroundTasks
+- LLM: Google Gemini via langchain-google-genai
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+import os
+import sys
+import logging
+from datetime import datetime
+from typing import Literal
+from pathlib import Path
+
+# Determine the base directory for PyInstaller compatibility
+if getattr(sys, 'frozen', False):
+    # Running as compiled exe
+    BASE_DIR = Path(sys.executable).parent
+else:
+    # Running as script
+    BASE_DIR = Path(__file__).parent
+
+# Load environment variables from the correct location
+from dotenv import load_dotenv
+env_path = BASE_DIR / '.env'
+load_dotenv(env_path)
+print(f"[Automation] Loading .env from: {env_path} (exists: {env_path.exists()})")
+print(f"[Automation] GEMINI_API_KEY configured: {bool(os.getenv('GEMINI_API_KEY'))}")
+
+from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, Literal
 import asyncio
 import uuid
-import json
-from datetime import datetime
-from agent import UniversityApplicationAgent
 
-app = FastAPI(title="UniConsulting Automation Service", version="1.0.0")
+from agent import UniversityApplicationAgent, run_automation_task
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("UniConsulting.Automation")
+
+# Initialize FastAPI application
+app = FastAPI(
+    title="UniConsulting Automation Service",
+    version="2.0.0",
+    description="Teacher-side browser automation for university applications"
+)
 
 # Allow CORS for Electron app
 app.add_middleware(
@@ -29,37 +67,117 @@ active_tasks: dict[str, dict] = {}
 websocket_connections: dict[str, WebSocket] = {}
 
 
+# =============================================================================
+# REQUEST/RESPONSE MODELS
+# =============================================================================
+
+class TaskRequest(BaseModel):
+    """Simple task request for /run-task endpoint (MANDATORY SPEC)"""
+    task: str
+
+
 class ApplicationRequest(BaseModel):
+    """Full application request with student data"""
     student_id: str
     student_data: dict  # Full student profile
     university_name: str
     mode: Literal["semi", "full"]  # semi = review before submit, full = auto submit
-    gemini_api_key: str
+    gemini_api_key: str | None = None  # Optional, defaults to env var
 
 
 class TaskStatus(BaseModel):
+    """Task status response"""
     task_id: str
     status: str
     progress: int
     message: str
     timestamp: str
-    account_created: Optional[dict] = None  # Portal credentials if created
+    account_created: dict | None = None
 
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
 
 @app.get("/")
 async def root():
-    return {"status": "running", "service": "UniConsulting Automation"}
+    """Health check endpoint"""
+    return {
+        "status": "running",
+        "service": "UniConsulting Automation",
+        "port": 8765,
+        "version": "2.0.0"
+    }
 
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    """Detailed health check"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "gemini_configured": bool(os.getenv("GEMINI_API_KEY"))
+    }
+
+
+@app.post("/run-task")
+async def run_task(request: TaskRequest):
+    """
+    MANDATORY ENDPOINT: /run-task
+    
+    CRITICAL NON-BLOCKING REQUIREMENT:
+    Uses asyncio.create_task to offload execution.
+    Returns immediately to prevent Electron main process from blocking.
+    
+    Input: {"task": "string"}
+    Output: {"status": "Task Started", "task_description": "..."}
+    """
+    task_id = str(uuid.uuid4())
+    task_description = request.task
+    
+    logger.info(f"[{task_id}] Received task: {task_description[:100]}...")
+    
+    # Store task info
+    active_tasks[task_id] = {
+        "status": "started",
+        "progress": 0,
+        "description": task_description,
+        "created_at": datetime.now().isoformat(),
+        "messages": ["Task queued for execution"],
+        "account_credentials": None
+    }
+    
+    # CRITICAL: Use asyncio.create_task for proper async execution
+    # FastAPI BackgroundTasks doesn't work correctly with browser-use async code
+    import asyncio
+    asyncio.create_task(
+        run_automation_task(
+            task_id=task_id,
+            task_description=task_description,
+            active_tasks=active_tasks,
+            websocket_connections=websocket_connections
+        )
+    )
+    
+    logger.info(f"[{task_id}] Task scheduled with asyncio.create_task")
+    
+    # Return IMMEDIATELY to prevent Electron blocking
+    return {
+        "status": "Task Started",
+        "task_description": task_description,
+        "task_id": task_id
+    }
 
 
 @app.post("/api/apply")
 async def start_application(request: ApplicationRequest):
     """Start a university application automation task"""
     task_id = str(uuid.uuid4())
+    
+    # Get API key from request or environment
+    api_key = request.gemini_api_key or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="GEMINI_API_KEY not configured")
     
     # Store task info
     active_tasks[task_id] = {
@@ -71,8 +189,15 @@ async def start_application(request: ApplicationRequest):
         "account_credentials": None
     }
     
-    # Start automation in background
-    asyncio.create_task(run_automation(task_id, request))
+    # Start automation with asyncio.create_task (non-blocking, works with async browser-use)
+    import asyncio
+    asyncio.create_task(
+        run_application_automation(
+            task_id,
+            request,
+            api_key
+        )
+    )
     
     return {"task_id": task_id, "status": "started"}
 
@@ -132,8 +257,12 @@ async def websocket_progress(websocket: WebSocket, task_id: str):
             del websocket_connections[task_id]
 
 
-async def run_automation(task_id: str, request: ApplicationRequest):
-    """Run the browser-use automation"""
+# =============================================================================
+# BACKGROUND TASK RUNNERS
+# =============================================================================
+
+async def run_application_automation(task_id: str, request: ApplicationRequest, api_key: str):
+    """Run the browser-use automation for university application"""
     task = active_tasks[task_id]
     
     async def update_progress(status: str, progress: int, message: str):
@@ -151,7 +280,7 @@ async def run_automation(task_id: str, request: ApplicationRequest):
                     "message": message,
                     "account_credentials": task.get("account_credentials")
                 })
-            except:
+            except Exception:
                 pass
     
     try:
@@ -159,7 +288,7 @@ async def run_automation(task_id: str, request: ApplicationRequest):
         
         # Create agent
         agent = UniversityApplicationAgent(
-            gemini_api_key=request.gemini_api_key,
+            gemini_api_key=api_key,
             progress_callback=update_progress
         )
         
@@ -189,11 +318,30 @@ async def run_automation(task_id: str, request: ApplicationRequest):
                 await update_progress("cancelled", 100, "Application cancelled by teacher.")
         else:
             await update_progress("completed", 100, result.get("message", "Application process completed!"))
+        
+        await agent.close()
             
     except Exception as e:
+        logger.error(f"[{task_id}] Automation error: {str(e)}")
         await update_progress("error", 0, f"Error: {str(e)}")
 
 
+# =============================================================================
+# MAIN ENTRY POINT
+# =============================================================================
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8765)
+    
+    logger.info("=" * 60)
+    logger.info("UniConsulting Automation Service Starting...")
+    logger.info(f"Port: 8765 (MANDATORY)")
+    logger.info(f"GEMINI_API_KEY configured: {bool(os.getenv('GEMINI_API_KEY'))}")
+    logger.info("=" * 60)
+    
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8765,  # MANDATORY PORT
+        log_level="info"
+    )

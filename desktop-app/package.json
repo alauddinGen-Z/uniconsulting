@@ -13,16 +13,20 @@
     "scripts": {
         "start": "electron .",
         "dev": "set ELECTRON_DEV=true && electron .",
+        "clean": "rimraf dist-react dist",
         "build": "electron-builder",
         "build-python": "node build-engine.js",
+        "build-automation": "cd automation-service && ..\\automation-service\\venv\\Scripts\\python.exe build_automation.py",
         "download-python": "node scripts/download-python.js",
+        "build-react": "cd src && npx tsc -b && npx vite build",
+        "verify:build": "node -e \"const fs=require('fs'); if(!fs.existsSync('./dist-react/index.html')) { console.error('❌ FATAL: dist-react/index.html missing!'); process.exit(1); } else { console.log('✅ VERIFIED: Vite build successful'); }\"",
         "build-frontend": "cd .. && npm run build:export && xcopy /E /I /Y out ..\\desktop-app\\frontend",
         "dist": "npm run build-python && npm run build",
         "dist:win": "electron-builder --win",
         "dist:mac": "electron-builder --mac",
         "dist:linux": "electron-builder --linux",
-        "build:student": "npm run build-frontend && electron-builder -c electron-builder-student.yml --win",
-        "build:teacher": "npm run download-python && npm run build-python && npm run build-frontend && electron-builder -c electron-builder-teacher.yml --win"
+        "build:student": "npm run clean && npm run build-react && npm run verify:build && electron-builder -c electron-builder-student.yml --win",
+        "build:teacher": "npm run clean && npm run download-python && npm run build-python && npm run build-automation && npm run build-react && npm run verify:build && electron-builder -c electron-builder-teacher.yml --win"
     },
     "dependencies": {
         "electron-store": "^8.1.0",
@@ -31,7 +35,8 @@
     "devDependencies": {
         "electron": "^28.1.0",
         "electron-builder": "^24.9.1",
-        "electron-icon-builder": "^2.0.1"
+        "electron-icon-builder": "^2.0.1",
+        "rimraf": "^6.1.2"
     },
     "build": {
         "appId": "com.uniconsulting.desktop",

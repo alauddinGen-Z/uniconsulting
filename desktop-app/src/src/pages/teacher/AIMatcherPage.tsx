@@ -47,18 +47,37 @@ export default function AIMatcherPage() {
     }, [user]);
 
     const loadStudents = async () => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
 
-        const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('teacher_id', user.id)
-            .eq('approval_status', 'approved')
-            .order('full_name');
+        try {
+            // Use AbortSignal for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        setStudents(data || []);
-        setIsLoading(false);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('teacher_id', user.id)
+                .eq('approval_status', 'approved')
+                .order('full_name')
+                .abortSignal(controller.signal);
+
+            clearTimeout(timeoutId);
+
+            if (error) {
+                console.error('[AIMatcherPage] Supabase error:', error);
+            }
+            setStudents(data || []);
+        } catch (err) {
+            console.error('[AIMatcherPage] Failed to load students:', err);
+            setStudents([]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const filteredStudents = searchQuery
@@ -194,13 +213,13 @@ export default function AIMatcherPage() {
                                         setError(null);
                                     }}
                                     className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all mb-1 ${selectedStudentId === student.id
-                                            ? 'bg-purple-500 text-white shadow-lg'
-                                            : 'hover:bg-slate-50 text-slate-700'
+                                        ? 'bg-purple-500 text-white shadow-lg'
+                                        : 'hover:bg-slate-50 text-slate-700'
                                         }`}
                                 >
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${selectedStudentId === student.id
-                                            ? 'bg-white/20 text-white'
-                                            : 'bg-gradient-to-br from-purple-400 to-pink-500 text-white'
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-gradient-to-br from-purple-400 to-pink-500 text-white'
                                         }`}>
                                         {student.full_name?.charAt(0) || '?'}
                                     </div>

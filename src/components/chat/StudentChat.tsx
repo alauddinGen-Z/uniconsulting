@@ -82,10 +82,10 @@ export default function StudentChat() {
                 .single();
 
             if (profile?.teacher_id) {
-                // Get teacher profile
+                // Get teacher profile (avatar_url column doesn't exist yet)
                 const { data: teacherData } = await supabase
                     .from('profiles')
-                    .select('id, full_name, avatar_url')
+                    .select('id, full_name')
                     .eq('id', profile.teacher_id)
                     .single();
 

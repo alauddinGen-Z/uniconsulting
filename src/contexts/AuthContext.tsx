@@ -50,18 +50,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const { data: profile } = await supabase
+            // Note: avatar_url column doesn't exist in profiles table yet
+            const { data: profile, error } = await supabase
                 .from("profiles")
-                .select("full_name, role, avatar_url")
+                .select("full_name, role")
                 .eq("id", authUser.id)
-                .single();
+                .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+
+            if (error) {
+                console.error("Error fetching profile:", error);
+                return;
+            }
 
             if (profile) {
                 const appUser: AppUser = {
                     id: authUser.id,
                     name: profile.full_name || authUser.email?.split("@")[0] || "User",
                     email: authUser.email || "",
-                    avatarUrl: profile.avatar_url || null,
+                    avatarUrl: null, // avatar_url column doesn't exist yet
                     role: profile.role as "student" | "teacher",
                 };
                 setAppUser(appUser);

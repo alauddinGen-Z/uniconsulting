@@ -88,13 +88,25 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && user && !isDataLoaded) {
       console.log('[App] Loading user data...');
+
+      // Timeout fallback - if data loading takes too long, proceed anyway
+      const dataTimeout = setTimeout(() => {
+        if (!isDataLoaded) {
+          console.warn('[App] Data loading timeout - proceeding with available data');
+          setIsDataLoaded(true);
+        }
+      }, 8000); // 8 second timeout for data loading
+
       Promise.all([
         loadStudents().catch(e => console.error('loadStudents error:', e)),
         loadMessages().catch(e => console.error('loadMessages error:', e))
       ]).finally(() => {
         console.log('[App] Data loaded');
         setIsDataLoaded(true);
+        clearTimeout(dataTimeout);
       });
+
+      return () => clearTimeout(dataTimeout);
     }
   }, [isAuthenticated, user, isDataLoaded, loadStudents, loadMessages]);
 

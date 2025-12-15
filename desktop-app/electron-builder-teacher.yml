@@ -14,7 +14,8 @@ files:
   - main.js
   - preload.js
   - splash.html
-  - frontend/**/*
+  - index.html
+  - dist-react/**/*
 
 # Include Python engine for automation
 extraResources:
@@ -22,19 +23,17 @@ extraResources:
     to: engine
     filter:
       - "**/*"
-  # Include browser-use automation service
-  - from: automation-service
-    to: automation-service
+  # Include compiled automation service (PyInstaller output)
+  - from: automation-service/dist/automation
+    to: automation
     filter:
-      - main.py
-      - agent.py
-      - requirements.txt
-      - "*.py"
+      - "**/*"
   # Include portable Python (for machines without Python installed)
   - from: python-embedded
     to: python-embedded
     filter:
       - "**/*"
+
 
 protocols:
   - name: UniConsulting Teacher
@@ -56,10 +55,17 @@ nsis:
   installerIcon: assets/icon.ico
   uninstallerIcon: assets/icon.ico
   installerHeaderIcon: assets/icon.ico
-  createDesktopShortcut: true
+  # Enhanced installer options
+  license: assets/LICENSE.txt
+  createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: UniConsulting Teacher
   runAfterFinish: true
+  # Delete app data on uninstall (optional)
+  deleteAppDataOnUninstall: false
+  # Multi-language support
+  unicode: true
+
 
 mac:
   target: dmg

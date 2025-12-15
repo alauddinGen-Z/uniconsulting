@@ -125,30 +125,58 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load students (for teacher)
     loadStudents: async () => {
         const { user } = get();
-        if (!user || user.role !== 'teacher') return;
+        if (!user || user.role !== 'teacher') {
+            console.log('[AppStore] Skipping loadStudents - not a teacher');
+            return;
+        }
 
-        const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('role', 'student')
-            .eq('teacher_id', user.id)
-            .order('created_at', { ascending: false });
+        try {
+            console.log('[AppStore] Loading students for teacher:', user.id);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'student')
+                .eq('teacher_id', user.id)
+                .order('created_at', { ascending: false });
 
-        if (data) set({ students: data as Student[] });
+            if (error) {
+                console.error('[AppStore] Error loading students:', error.message);
+                return;
+            }
+
+            console.log('[AppStore] Loaded', data?.length || 0, 'students');
+            set({ students: (data || []) as Student[] });
+        } catch (error) {
+            console.error('[AppStore] Exception in loadStudents:', error);
+        }
     },
 
     // Load messages
     loadMessages: async () => {
         const { user } = get();
-        if (!user) return;
+        if (!user) {
+            console.log('[AppStore] Skipping loadMessages - no user');
+            return;
+        }
 
-        const { data } = await supabase
-            .from('messages')
-            .select('*')
-            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-            .order('created_at', { ascending: true });
+        try {
+            console.log('[AppStore] Loading messages for user:', user.id);
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+                .order('created_at', { ascending: true });
 
-        if (data) set({ messages: data as Message[] });
+            if (error) {
+                console.error('[AppStore] Error loading messages:', error.message);
+                return;
+            }
+
+            console.log('[AppStore] Loaded', data?.length || 0, 'messages');
+            set({ messages: (data || []) as Message[] });
+        } catch (error) {
+            console.error('[AppStore] Exception in loadMessages:', error);
+        }
     },
 
     // Logout

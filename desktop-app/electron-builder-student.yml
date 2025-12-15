@@ -14,7 +14,8 @@ files:
   - main.js
   - preload.js
   - splash.html
-  - frontend/**/*
+  - index.html
+  - dist-react/**/*
 
 # No extraResources for student version (no Python engine)
 extraResources: []

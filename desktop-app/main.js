@@ -417,32 +417,47 @@ function transitionToMainWindow() {
 }
 
 // ============================================================================
-// Auto-Update Flow
+// Auto-Update Flow (with Safety Valve Timeout)
 // ============================================================================
+
+const UPDATER_TIMEOUT_MS = 10000; // 10 seconds - Safety valve to prevent infinite hang
 
 function setupAutoUpdater() {
     if (!autoUpdater) {
+        log('Auto-updater not available, skipping');
         updateSplashStatus('Loading...');
         createMainWindow();
         return;
     }
 
     updateSplashStatus('Checking for updates...');
+    log('🔄 Starting update check with 10s timeout...');
 
+    // Flag to prevent duplicate createMainWindow calls
+    let isResolved = false;
+    const resolveOnce = (reason) => {
+        if (isResolved) return;
+        isResolved = true;
+        log(`Update check resolved: ${reason}`);
+    };
+
+    // Setup event listeners for update flow
     autoUpdater.on('checking-for-update', () => {
         log('Checking for updates...');
         updateSplashStatus('Checking for updates...');
     });
 
     autoUpdater.on('update-available', (info) => {
-        log(`Update available: ${info.version}`);
+        resolveOnce('update-found');
+        log(`✅ Update available: ${info.version}`);
         updateAvailable = true;
         updateSplashStatus('Downloading update...', true, 0);
         autoUpdater.downloadUpdate();
     });
 
     autoUpdater.on('update-not-available', () => {
-        log('No update available');
+        resolveOnce('no-update');
+        log('ℹ️ No update available');
         updateSplashStatus('Starting...');
         createMainWindow();
     });
@@ -464,16 +479,43 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on('error', (error) => {
-        log(`Auto-updater error: ${error.message}`);
+        resolveOnce('error');
+        log(`⚠️ Auto-updater error (continuing anyway): ${error.message}`);
         updateSplashStatus('Starting...');
         createMainWindow();
     });
 
-    // Start checking for updates
-    autoUpdater.checkForUpdates().catch((err) => {
-        log(`Update check failed: ${err.message}`);
-        updateSplashStatus('Starting...');
-        createMainWindow();
+    // Promise 1: The actual update check
+    const updateCheckPromise = new Promise((resolve) => {
+        autoUpdater.once('update-available', () => resolve('update-found'));
+        autoUpdater.once('update-not-available', () => resolve('continue'));
+        autoUpdater.once('error', () => resolve('continue'));
+
+        // Trigger the check
+        autoUpdater.checkForUpdates().catch((err) => {
+            log(`Update check failed: ${err.message}`);
+            resolve('continue');
+        });
+    });
+
+    // Promise 2: The Safety Valve (10 second timeout)
+    const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+            log(`⏰ Updater timed out after ${UPDATER_TIMEOUT_MS}ms. Skipping update check.`);
+            resolve('timeout');
+        }, UPDATER_TIMEOUT_MS);
+    });
+
+    // RACE THEM - whichever resolves first wins
+    Promise.race([updateCheckPromise, timeoutPromise]).then((result) => {
+        if (result === 'timeout' && !isResolved) {
+            resolveOnce('timeout');
+            log('Update check timed out - proceeding to app');
+            updateSplashStatus('Starting...');
+            createMainWindow();
+        }
+        // If result is 'update-found', the download process handles it
+        // If result is 'continue', the event handler already called createMainWindow
     });
 }
 
@@ -564,98 +606,144 @@ async function runEngine(studentData) {
 
 let automationServiceProcess = null;
 const AUTOMATION_SERVICE_PORT = 8765;
+let chromiumInstalled = false;
 
-function getAutomationServicePath() {
-    if (isDev) {
-        return path.join(__dirname, 'automation-service');
-    } else {
-        return path.join(process.resourcesPath, 'automation-service');
-    }
-}
+/**
+ * Check if Playwright Chromium is installed on the system
+ * Playwright stores browsers in a cache directory
+ */
+function isPlaywrightChromiumInstalled() {
+    const fs = require('fs');
+    const os = require('os');
 
-function getPythonPath() {
-    if (isDev) {
-        // In development, use system Python
-        return 'python';
-    } else {
-        // In production, use bundled Python
-        const bundledPython = path.join(process.resourcesPath, 'python-embedded', 'python.exe');
-        const fs = require('fs');
-        if (fs.existsSync(bundledPython)) {
-            return bundledPython;
+    // Playwright default browser cache locations
+    const cacheLocations = [
+        path.join(os.homedir(), 'AppData', 'Local', 'ms-playwright'),
+        path.join(os.homedir(), '.cache', 'ms-playwright'),
+    ];
+
+    for (const loc of cacheLocations) {
+        if (fs.existsSync(loc)) {
+            const files = fs.readdirSync(loc);
+            if (files.some(f => f.includes('chromium'))) {
+                log(`Playwright Chromium found at: ${loc}`);
+                return true;
+            }
         }
-        // Fallback to system Python if bundled not found
-        return 'python';
     }
+    return false;
 }
 
-async function checkAutomationServiceInstalled() {
-    const servicePath = getAutomationServicePath();
-    const venvPath = path.join(servicePath, 'venv');
+/**
+ * Download Playwright Chromium browser
+ * Shows progress dialog to user
+ */
+async function ensurePlaywrightChromium() {
+    if (chromiumInstalled || isPlaywrightChromiumInstalled()) {
+        chromiumInstalled = true;
+        return true;
+    }
+
+    log('Playwright Chromium not found - downloading...');
+
+    // Show download dialog
+    const { dialog } = require('electron');
+
+    // Get the playwright command path from the bundled automation
     const fs = require('fs');
-    return fs.existsSync(venvPath);
-}
+    const playwrightCmd = path.join(process.resourcesPath, 'automation', '_internal', 'playwright', 'driver', 'playwright.cmd');
 
-async function installAutomationDependencies() {
-    const servicePath = getAutomationServicePath();
-    const pythonPath = getPythonPath();
-    const fs = require('fs');
+    if (!fs.existsSync(playwrightCmd)) {
+        log('Playwright driver not found in bundle');
+        return false;
+    }
 
-    log('Installing automation service dependencies...');
+    // Show a progress notification
+    if (mainWindow) {
+        mainWindow.webContents.send('automation-status', {
+            type: 'downloading',
+            message: 'Downloading browser for automation (first-time setup)...'
+        });
+    }
 
-    // Update splash to show install progress
-    updateSplashStatus('Installing automation engine...', true, 30);
+    return new Promise((resolve) => {
+        log(`Running: ${playwrightCmd} install chromium`);
 
-    return new Promise((resolve, reject) => {
-        const venvPath = path.join(servicePath, 'venv');
+        const installProcess = spawn('cmd.exe', ['/c', playwrightCmd, 'install', 'chromium'], {
+            env: process.env,
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
 
-        // Create venv
-        const createVenv = spawn(pythonPath, ['-m', 'venv', venvPath], { cwd: servicePath });
+        installProcess.stdout.on('data', (data) => {
+            log(`[Playwright]: ${data.toString().trim()}`);
+        });
 
-        createVenv.on('close', (code) => {
-            if (code !== 0) {
-                log('Failed to create venv');
-                resolve(false);
-                return;
-            }
+        installProcess.stderr.on('data', (data) => {
+            log(`[Playwright]: ${data.toString().trim()}`);
+        });
 
-            updateSplashStatus('Installing dependencies...', true, 50);
-
-            // Install requirements
-            const pipPath = process.platform === 'win32'
-                ? path.join(venvPath, 'Scripts', 'pip.exe')
-                : path.join(venvPath, 'bin', 'pip');
-
-            const requirementsPath = path.join(servicePath, 'requirements.txt');
-
-            if (!fs.existsSync(requirementsPath)) {
-                log('requirements.txt not found');
-                resolve(false);
-                return;
-            }
-
-            const installDeps = spawn(pipPath, ['install', '-r', requirementsPath], { cwd: servicePath });
-
-            installDeps.stdout.on('data', (data) => {
-                log(`[pip]: ${data.toString().trim()}`);
-            });
-
-            installDeps.stderr.on('data', (data) => {
-                log(`[pip error]: ${data.toString().trim()}`);
-            });
-
-            installDeps.on('close', (code) => {
-                if (code === 0) {
-                    log('Dependencies installed successfully');
-                    updateSplashStatus('Automation ready!', true, 100);
-                    resolve(true);
-                } else {
-                    log('Failed to install dependencies');
-                    resolve(false);
+        installProcess.on('close', (code) => {
+            if (code === 0) {
+                log('Playwright Chromium installed successfully');
+                chromiumInstalled = true;
+                if (mainWindow) {
+                    mainWindow.webContents.send('automation-status', {
+                        type: 'ready',
+                        message: 'Browser downloaded! Automation ready.'
+                    });
                 }
-            });
+                resolve(true);
+            } else {
+                log(`Playwright install failed with code ${code}`);
+                if (mainWindow) {
+                    mainWindow.webContents.send('automation-status', {
+                        type: 'error',
+                        message: 'Failed to download browser. Check internet connection.'
+                    });
+                }
+                resolve(false);
+            }
+        });
+
+        installProcess.on('error', (err) => {
+            log(`Playwright install error: ${err.message}`);
+            resolve(false);
         });
     });
+}
+
+/**
+ * Get the path to the automation service
+ * In production: uses compiled automation.exe from PyInstaller
+ * In development: uses Python script directly
+ */
+function getAutomationServiceCommand() {
+    const fs = require('fs');
+
+
+    if (isDev) {
+        // Development: use Python script with venv
+        const venvPython = path.join(__dirname, 'automation-service', 'venv', 'Scripts', 'python.exe');
+        const mainPy = path.join(__dirname, 'automation-service', 'main.py');
+
+        if (fs.existsSync(venvPython)) {
+            return { command: venvPython, args: [mainPy], cwd: path.join(__dirname, 'automation-service') };
+        }
+        // Fallback to system Python
+        return { command: 'python', args: [mainPy], cwd: path.join(__dirname, 'automation-service') };
+    } else {
+        // Production: use compiled PyInstaller executable
+        const automationExe = path.join(process.resourcesPath, 'automation', 'automation.exe');
+        const automationDir = path.join(process.resourcesPath, 'automation');
+
+        if (fs.existsSync(automationExe)) {
+            log(`Found automation exe at: ${automationExe}`);
+            return { command: automationExe, args: [], cwd: automationDir };
+        }
+
+        log('WARNING: Compiled automation.exe not found');
+        return null;
+    }
 }
 
 async function startAutomationService() {
@@ -664,66 +752,62 @@ async function startAutomationService() {
         return true;
     }
 
-    const servicePath = getAutomationServicePath();
-    const fs = require('fs');
-
-    // Check if service files exist
-    const mainPyPath = path.join(servicePath, 'main.py');
-    if (!fs.existsSync(mainPyPath)) {
-        log('Automation service main.py not found - skipping');
-        return false;
-    }
-
-    // Check if dependencies are installed
-    const isInstalled = await checkAutomationServiceInstalled();
-    if (!isInstalled) {
-        const installed = await installAutomationDependencies();
-        if (!installed) {
-            log('Failed to install automation dependencies');
-            return false;
+    // Ensure Playwright Chromium is installed (downloads on first run)
+    if (!isDev) {
+        const chromiumReady = await ensurePlaywrightChromium();
+        if (!chromiumReady) {
+            log('WARNING: Playwright Chromium not available - automation may fail');
         }
     }
 
-    const venvPath = path.join(servicePath, 'venv');
-    const pythonExe = process.platform === 'win32'
-        ? path.join(venvPath, 'Scripts', 'python.exe')
-        : path.join(venvPath, 'bin', 'python');
+    const serviceCmd = getAutomationServiceCommand();
+
+    if (!serviceCmd) {
+        log('Automation service not available - skipping');
+        return false;
+    }
 
     log(`Starting automation service at port ${AUTOMATION_SERVICE_PORT}...`);
+    log(`Command: ${serviceCmd.command} ${serviceCmd.args.join(' ')}`);
 
-    automationServiceProcess = spawn(pythonExe, [mainPyPath], {
-        cwd: servicePath,
-        env: {
-            ...process.env,
-            PYTHONUNBUFFERED: '1',
-        },
-        detached: false,
-        stdio: ['ignore', 'pipe', 'pipe']
-    });
+    try {
+        automationServiceProcess = spawn(serviceCmd.command, serviceCmd.args, {
+            cwd: serviceCmd.cwd,
+            env: {
+                ...process.env,
+                PYTHONUNBUFFERED: '1',
+            },
+            detached: false,
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
 
-    automationServiceProcess.stdout.on('data', (data) => {
-        log(`[AutoService]: ${data.toString().trim()}`);
-    });
+        automationServiceProcess.stdout.on('data', (data) => {
+            log(`[AutoService]: ${data.toString().trim()}`);
+        });
 
-    automationServiceProcess.stderr.on('data', (data) => {
-        log(`[AutoService Error]: ${data.toString().trim()}`);
-    });
+        automationServiceProcess.stderr.on('data', (data) => {
+            log(`[AutoService Error]: ${data.toString().trim()}`);
+        });
 
-    automationServiceProcess.on('close', (code) => {
-        log(`Automation service exited with code ${code}`);
-        automationServiceProcess = null;
-    });
+        automationServiceProcess.on('close', (code) => {
+            log(`Automation service exited with code ${code}`);
+            automationServiceProcess = null;
+        });
 
-    automationServiceProcess.on('error', (err) => {
-        log(`Automation service error: ${err.message}`);
-        automationServiceProcess = null;
-    });
+        automationServiceProcess.on('error', (err) => {
+            log(`Automation service error: ${err.message}`);
+            automationServiceProcess = null;
+        });
 
-    // Wait a moment for the service to start
-    await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait a moment for the service to start
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-    log('Automation service started');
-    return true;
+        log('Automation service started successfully');
+        return true;
+    } catch (err) {
+        log(`Failed to start automation service: ${err.message}`);
+        return false;
+    }
 }
 
 function stopAutomationService() {
@@ -738,6 +822,7 @@ function stopAutomationService() {
     }
 }
 
+
 // ============================================================================
 // IPC Handlers
 // ============================================================================
@@ -748,6 +833,7 @@ ipcMain.handle('get-version', () => app.getVersion());
 
 ipcMain.handle('get-auth-token', () => ({
     token: store.get('authToken'),
+    refreshToken: store.get('refreshToken'),
     email: store.get('userEmail'),
 }));
 
@@ -956,8 +1042,22 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+    log('Before quit - stopping services...');
     killEngine();
     stopAutomationService();
+});
+
+// Additional cleanup on will-quit (ensures zombie processes are killed)
+app.on('will-quit', (event) => {
+    log('Will quit - final cleanup...');
+    if (automationServiceProcess) {
+        log('Killing automation service process...');
+        stopAutomationService();
+    }
+    if (engineProcess) {
+        log('Killing engine process...');
+        killEngine();
+    }
 });
 
 // Handle deep link from app startup (Windows)

@@ -1,3 +1,12 @@
+/**
+ * Automation Hub - Data Copying Page
+ * 
+ * Copy student data and fill application forms efficiently.
+ * This is the data copying functionality (separate from AI Browser Automation).
+ * 
+ * @file desktop-app/src/src/pages/teacher/AutomationPage.tsx
+ */
+
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { supabase } from '../../lib/supabase';
@@ -54,7 +63,7 @@ interface ProfileData {
     preferred_university?: string;
     preferred_major?: string;
 
-    // Family - based on database.types.ts
+    // Family
     father_name?: string;
     father_occupation?: string;
     mother_name?: string;
@@ -93,18 +102,37 @@ export default function AutomationPage() {
     }, [user]);
 
     const loadStudents = async () => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
 
-        const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('teacher_id', user.id)
-            .eq('approval_status', 'approved')
-            .order('full_name');
+        try {
+            // Use AbortSignal for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        setStudents(data || []);
-        setIsLoading(false);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('teacher_id', user.id)
+                .eq('approval_status', 'approved')
+                .order('full_name')
+                .abortSignal(controller.signal);
+
+            clearTimeout(timeoutId);
+
+            if (error) {
+                console.error('[AutomationPage] Supabase error:', error);
+            }
+            setStudents(data || []);
+        } catch (err) {
+            console.error('[AutomationPage] Failed to load students:', err);
+            setStudents([]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleSelectStudent = async (studentId: string) => {
@@ -175,7 +203,7 @@ ${profileData.city || ''} ${profileData.country || ''}`;
         setDownloadingId(doc.id);
 
         try {
-            // Remove 'documents/' prefix if present (storage path format)
+            // Remove 'documents/' prefix if present
             const storagePath = doc.file_url.replace('documents/', '');
 
             const { data, error } = await supabase.storage
@@ -184,13 +212,13 @@ ${profileData.city || ''} ${profileData.country || ''}`;
 
             if (error) throw error;
 
-            // Create filename with student name and doc type
+            // Create filename
             const studentName = profileData.full_name?.replace(/\s+/g, '_') || 'Student';
             const docType = doc.type || 'Document';
             const extension = doc.file_url.split('.').pop() || 'pdf';
             const fileName = `${studentName}_${docType}.${extension}`;
 
-            // Create blob URL and trigger download
+            // Trigger download
             const url = URL.createObjectURL(data);
             const a = document.createElement('a');
             a.href = url;
@@ -201,7 +229,6 @@ ${profileData.city || ''} ${profileData.country || ''}`;
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Download error:', error);
-            // Fallback: try opening the file_url directly
             if (doc.file_url.startsWith('http')) {
                 window.open(doc.file_url, '_blank');
             }
@@ -219,8 +246,8 @@ ${profileData.city || ''} ${profileData.country || ''}`;
                         <Zap className="w-7 h-7 text-orange-600" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Automation Hub</h1>
-                        <p className="text-slate-500">Copy data or auto-apply to universities</p>
+                        <h1 className="text-2xl font-bold text-slate-900">AUTOMATION HUB</h1>
+                        <p className="text-slate-500">Copy student data and fill application forms efficiently.</p>
                     </div>
                 </div>
 
