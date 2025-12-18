@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles, Shield } from "lucide-react";
+import { LayoutGrid, Users, Zap, LogOut, Settings, MessageCircle, Sparkles, Shield, Kanban } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
@@ -71,6 +71,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
     const navItems = [
         { id: 'home', label: t('nav.command_center'), icon: LayoutGrid },
         { id: 'students', label: t('nav.students'), icon: Users },
+        { id: 'kanban', label: 'Kanban Board', icon: Kanban },
         { id: 'ai-matcher', label: t('nav.ai_matcher'), icon: Sparkles, hasAI: true },
         { id: 'messages', label: t('nav.messages'), icon: MessageCircle },
         { id: 'automation', label: t('nav.automation'), icon: Zap },

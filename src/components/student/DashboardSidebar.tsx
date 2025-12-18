@@ -83,6 +83,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, isMobileOpen 
         { id: "profile", label: t("nav.profile"), icon: User },
         { id: "application", label: t("nav.application"), icon: GraduationCap, hasAI: true },
         { id: "documents", label: t("nav.documents"), icon: FolderOpen },
+        { id: "scholarships", label: "Scholarships", icon: Sparkles, hasAI: true },
         { id: "messages", label: t("nav.messages"), icon: MessageCircle },
     ];
 
