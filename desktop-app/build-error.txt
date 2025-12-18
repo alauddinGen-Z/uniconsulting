@@ -1,0 +1,56 @@
+﻿-------------------------------------------
+ЁЯФТ VITE ISOLATION LOCK: ACTIVE
+ЁЯУВ Root: D:/Project1/uniconsulting/uniconsulting/desktop-app/src
+ЁЯЪА OutDir: ../dist-react
+ЁЯУН Source: desktop-app/src/vite.config.ts
+-------------------------------------------
+[36mvite v7.2.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mтЬУ[39m 1863 modules transformed.
+node.exe : [31mтЬЧ[39m Build failed in 3.93s
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo          : NotSpecified: ([31mтЬЧ[39m Build 
+    failed in 3.93s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31merror during build:
+[31m[commonjs--resolver] Invalid value "iife" for option 
+"worker.format" - UMD and IIFE output formats are not supported 
+for code-splitting builds.[31m
+file: [36mD:/Project1/uniconsulting/uniconsulting/desktop-app/no
+de_modules/@powersync/web/lib/src/worker/db/open-worker-database.
+js[31m
+    at getRollupError (file:///D:/Project1/uniconsulting/uniconsu
+lting/desktop-app/src/node_modules/rollup/dist/es/shared/parseAst
+.js:401:41)
+    at error (file:///D:/Project1/uniconsulting/uniconsulting/des
+ktop-app/src/node_modules/rollup/dist/es/shared/parseAst.js:397:4
+2)
+    at validateOptionsForMultiChunkOutput (file:///D:/Project1/un
+iconsulting/uniconsulting/desktop-app/src/node_modules/rollup/dis
+t/es/shared/node-entry.js:20673:16)
+    at Bundle.generate (file:///D:/Project1/uniconsulting/unicons
+ulting/desktop-app/src/node_modules/rollup/dist/es/shared/node-en
+try.js:20564:17)
+    at async file:///D:/Project1/uniconsulting/uniconsulting/desk
+top-app/src/node_modules/rollup/dist/es/shared/node-entry.js:2343
+8:27
+    at async catchUnfinishedHookActions (file:///D:/Project1/unic
+onsulting/uniconsulting/desktop-app/src/node_modules/rollup/dist/
+es/shared/node-entry.js:22805:16)
+    at async bundleWorkerEntry (file:///D:/Project1/uniconsulting
+/uniconsulting/desktop-app/src/node_modules/vite/dist/node/chunks
+/config.js:26680:12)
+    at async workerFileToUrl (file:///D:/Project1/uniconsulting/u
+niconsulting/desktop-app/src/node_modules/vite/dist/node/chunks/c
+onfig.js:26713:17)
+    at async Object.handler (file:///D:/Project1/uniconsulting/un
+iconsulting/desktop-app/src/node_modules/vite/dist/node/chunks/co
+nfig.js:27637:23)
+    at async transform (file:///D:/Project1/uniconsulting/unicons
+ulting/desktop-app/src/node_modules/rollup/dist/es/shared/node-en
+try.js:21163:16)[39m

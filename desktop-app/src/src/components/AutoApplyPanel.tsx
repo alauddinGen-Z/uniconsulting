@@ -1,29 +1,23 @@
 /**
- * Streamlined AutoApplyPanel Component
+ * AutoApplyPanel Component - Runs automation in background
  * 
- * Simple flow: Select student → Enter university → Click Start → AI does everything
- * - Prompt is built internally and sent directly to AI browser agent
- * - No manual copying needed - fully automated
- * - Password format: studentname + year of birth + ")"
+ * Flow: Select student → Enter university → Click Start → Automation runs in background
+ * - Builds prompt from student data
+ * - Calls automation service directly (same as AI Browser)
+ * - Shows progress in this panel without navigating away
  * 
  * @file desktop-app/src/src/components/AutoApplyPanel.tsx
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { Bot, Sparkles, Building2, Loader2, CheckCircle, AlertCircle, Terminal, Square } from 'lucide-react';
 import {
-    Bot, CheckCircle, AlertCircle, Key,
-    ExternalLink, Loader2, Building2, Sparkles
-} from 'lucide-react';
-import { getGeminiApiKey } from '../lib/supabase';
-
-const AUTOMATION_SERVICE_URL = 'http://127.0.0.1:8765';
-
-interface AutomationProgress {
-    status: string;
-    progress: number;
-    message: string;
-    account_credentials?: { email: string; password: string; university: string };
-}
+    startAutomation,
+    isServiceRunning,
+    connectToTaskUpdates,
+    type TaskStatusResponse,
+} from '../lib/automation';
+import { supabase } from '../lib/supabase';
 
 interface StudentData {
     id: string;
@@ -63,36 +57,111 @@ interface AutoApplyPanelProps {
     studentData: StudentData | null;
 }
 
+interface LogEntry {
+    timestamp: string;
+    message: string;
+    type: 'info' | 'success' | 'error' | 'system';
+}
+
+type TaskStatus = 'idle' | 'running' | 'completed' | 'error';
+
 export default function AutoApplyPanel({ studentData }: AutoApplyPanelProps) {
-    // Form inputs
     const [universityName, setUniversityName] = useState('');
+    const [serviceReady, setServiceReady] = useState(false);
+    const [taskStatus, setTaskStatus] = useState<TaskStatus>('idle');
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [suggestions, setSuggestions] = useState<{ name: string; country: string }[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
-    // Automation state
-    const [isAutomating, setIsAutomating] = useState(false);
-    const [automationProgress, setAutomationProgress] = useState<AutomationProgress | null>(null);
-    const [automationTaskId, setAutomationTaskId] = useState<string | null>(null);
+    const wsCleanupRef = useRef<(() => void) | null>(null);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+    const isMounted = useRef(true);
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Config
-    const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || getGeminiApiKey());
-    const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-    const [serviceStatus, setServiceStatus] = useState<'unknown' | 'running' | 'stopped'>('unknown');
-
-    const wsRef = useRef<WebSocket | null>(null);
-
-    // Check service status
+    // Check service status on mount
     useEffect(() => {
-        const checkService = async () => {
-            try {
-                const response = await fetch(`${AUTOMATION_SERVICE_URL}/health`);
-                setServiceStatus(response.ok ? 'running' : 'stopped');
-            } catch {
-                setServiceStatus('stopped');
+        isMounted.current = true;
+        checkServiceStatus();
+
+        return () => {
+            isMounted.current = false;
+            if (wsCleanupRef.current) {
+                wsCleanupRef.current();
             }
         };
-        checkService();
-        const interval = setInterval(checkService, 10000);
-        return () => clearInterval(interval);
     }, []);
+
+    // Auto-scroll logs
+    useEffect(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
+
+    const checkServiceStatus = async () => {
+        try {
+            const running = await isServiceRunning();
+            setServiceReady(running);
+        } catch {
+            setServiceReady(false);
+        }
+    };
+
+    const addLog = (message: string, type: LogEntry['type'] = 'info') => {
+        const timestamp = new Date().toLocaleTimeString();
+        setLogs(prev => [...prev, { timestamp, message, type }]);
+    };
+
+    // Search universities with debouncing
+    const handleUniversitySearch = async (query: string) => {
+        setUniversityName(query);
+
+        if (query.length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        // Clear previous timeout
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        // Debounce search
+        searchTimeoutRef.current = setTimeout(async () => {
+            setIsSearching(true);
+            console.log('[AutoApply] Searching universities for:', query);
+            try {
+                const { data, error } = await supabase
+                    .from('universities')
+                    .select('university_name, country')
+                    .ilike('university_name', `%${query}%`)
+                    .limit(8);
+
+                console.log('[AutoApply] Search result:', { data, error });
+
+                if (error) {
+                    console.error('[AutoApply] Supabase error:', error);
+                } else if (data && data.length > 0) {
+                    setSuggestions(data.map(d => ({ name: d.university_name, country: d.country })));
+                    setShowSuggestions(true);
+                    console.log('[AutoApply] Found', data.length, 'universities');
+                } else {
+                    console.log('[AutoApply] No universities found');
+                    setSuggestions([]);
+                }
+            } catch (err) {
+                console.error('[AutoApply] University search error:', err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 200);
+    };
+
+    const selectUniversity = (name: string) => {
+        setUniversityName(name);
+        setShowSuggestions(false);
+        setSuggestions([]);
+    };
 
     // Generate password: studentname + year of birth + ")"
     const generatePassword = (student: StudentData): string => {
@@ -101,7 +170,7 @@ export default function AutoApplyPanel({ studentData }: AutoApplyPanelProps) {
         return `${namePart}${yearPart})`;
     };
 
-    // Build the complete prompt for AI agent (sent directly, not shown to user)
+    // Build the complete prompt for AI agent
     const buildPrompt = useMemo(() => {
         if (!studentData || !universityName) return '';
 
@@ -110,144 +179,140 @@ export default function AutoApplyPanel({ studentData }: AutoApplyPanelProps) {
 
         return `## UNIVERSITY APPLICATION TASK
 
-You are applying to **${universityName}** for the following student. Fill all forms with the data below and STOP before final submission.
+Apply to **${universityName}** for student. Fill forms with data below. STOP before final submission.
 
----
+### ACCOUNT (if needed)
+- Email: ${formatValue(studentData.email)}
+- Password: ${password}
 
-### ACCOUNT CREATION (if needed)
-If the university requires account creation:
-- **Email**: ${formatValue(studentData.email)}
-- **Password**: ${password}
-- Report these credentials in your response
+### STUDENT INFO
+- Name: ${formatValue(studentData.full_name)}
+- DOB: ${formatValue(studentData.date_of_birth)}
+- Gender: ${formatValue(studentData.gender)}
+- Nationality: ${formatValue(studentData.nationality)}
+- Phone: ${formatValue(studentData.phone)}
+- Email: ${formatValue(studentData.email)}
 
----
+### ADDRESS
+- Address: ${formatValue(studentData.home_address)}
+- City: ${formatValue(studentData.city)}, ${formatValue(studentData.country)}
 
-### STUDENT PERSONAL INFORMATION
+### PASSPORT
+- Number: ${formatValue(studentData.passport_number)}
+- Expiry: ${formatValue(studentData.passport_expiry)}
 
-**Full Name**: ${formatValue(studentData.full_name)}
-**Email**: ${formatValue(studentData.email)}
-**Phone**: ${formatValue(studentData.phone)}
-**Date of Birth**: ${formatValue(studentData.date_of_birth)}
-**Gender**: ${formatValue(studentData.gender)}
-**Nationality**: ${formatValue(studentData.nationality)}
-**City of Birth**: ${formatValue(studentData.city_of_birth)}
+### ACADEMICS
+- GPA: ${formatValue(studentData.gpa)}${studentData.gpa_scale ? `/${studentData.gpa_scale}` : ''}
+- SAT: ${formatValue(studentData.sat_total, 'N/A')} (Math: ${formatValue(studentData.sat_math, 'N/A')}, Reading: ${formatValue(studentData.sat_reading, 'N/A')})
+- IELTS: ${formatValue(studentData.ielts_overall, 'N/A')} (L:${formatValue(studentData.ielts_listening, '-')} R:${formatValue(studentData.ielts_reading, '-')} W:${formatValue(studentData.ielts_writing, '-')} S:${formatValue(studentData.ielts_speaking, '-')})
+- TOEFL: ${formatValue(studentData.toefl_total, 'N/A')}
+- Major: ${formatValue(studentData.preferred_major)}
 
-**Passport Number**: ${formatValue(studentData.passport_number)}
-**Passport Expiry**: ${formatValue(studentData.passport_expiry)}
-
-**Home Address**: ${formatValue(studentData.home_address)}
-**City**: ${formatValue(studentData.city)}
-**Country**: ${formatValue(studentData.country)}
-
----
-
-### ACADEMIC QUALIFICATIONS
-
-**GPA**: ${formatValue(studentData.gpa)}${studentData.gpa_scale ? ` / ${studentData.gpa_scale}` : ''}
-
-**SAT Scores**:
-- Total: ${formatValue(studentData.sat_total, 'N/A')}
-- Math: ${formatValue(studentData.sat_math, 'N/A')}
-- Reading/Writing: ${formatValue(studentData.sat_reading, 'N/A')}
-
-**IELTS Scores**:
-- Overall: ${formatValue(studentData.ielts_overall, 'N/A')}
-- Listening: ${formatValue(studentData.ielts_listening, 'N/A')}
-- Reading: ${formatValue(studentData.ielts_reading, 'N/A')}
-- Writing: ${formatValue(studentData.ielts_writing, 'N/A')}
-- Speaking: ${formatValue(studentData.ielts_speaking, 'N/A')}
-
-**TOEFL Total**: ${formatValue(studentData.toefl_total, 'N/A')}
-
-**Preferred Major**: ${formatValue(studentData.preferred_major)}
-
----
-
-### FAMILY INFORMATION
-
-**Father**: ${formatValue(studentData.father_name)} (${formatValue(studentData.father_occupation, 'Occupation not specified')})
-**Mother**: ${formatValue(studentData.mother_name)} (${formatValue(studentData.mother_occupation, 'Occupation not specified')})
-
----
+### FAMILY
+- Father: ${formatValue(studentData.father_name)} (${formatValue(studentData.father_occupation, 'N/A')})
+- Mother: ${formatValue(studentData.mother_name)} (${formatValue(studentData.mother_occupation, 'N/A')})
 
 ### INSTRUCTIONS
-
-1. Go to Google and search for "${universityName} undergraduate application"
-2. Navigate to the official application portal
-3. If account creation is required, use the email and password above
-4. Fill ALL form fields with the student information above
-5. For fields not available, select "Other" or leave blank if optional
-6. For essay questions, write: "Essay will be submitted separately by advisor"
-7. For document uploads, skip and note which documents are required
-8. **CRITICAL: STOP before clicking final Submit button**
-9. Report status as "Ready for Review" with summary of filled fields
+1. Go to duckduckgo.com and search "${universityName} undergraduate application portal"
+2. Click on the official university application portal (not ads)
+3. Create account if needed (use email/password above)
+4. Fill ALL form fields with student data
+5. For essays: "Essay submitted separately by advisor"
+6. Skip document uploads, note what's required
+7. **STOP before final Submit button**
 
 Begin now.`;
     }, [studentData, universityName]);
 
-    // Save API key
-    const saveApiKey = (key: string) => {
-        setGeminiApiKey(key);
-        localStorage.setItem('gemini_api_key', key);
-        setShowApiKeyInput(false);
-    };
+    // Handle task updates from WebSocket
+    const lastMessageRef = useRef<string>('');
+    const handleTaskUpdate = (update: TaskStatusResponse) => {
+        if (!isMounted.current) return;
 
-    // Start automation - sends prompt directly to AI agent
-    const startAutomation = async () => {
-        if (!studentData || !universityName || !geminiApiKey) return;
+        // Skip duplicate "Processing..." messages
+        const message = update.message || 'Processing...';
+        if (message === 'Processing...' && lastMessageRef.current === 'Processing...') {
+            return; // Don't spam with repetitive processing messages
+        }
+        lastMessageRef.current = message;
 
-        setIsAutomating(true);
-        setAutomationProgress({ status: 'starting', progress: 0, message: 'Initializing AI browser agent...' });
+        // Only log meaningful messages (not just "Processing...")
+        if (message !== 'Processing...') {
+            addLog(message, 'info');
+        }
 
-        try {
-            const response = await fetch(`${AUTOMATION_SERVICE_URL}/api/apply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    student_id: studentData.id,
-                    student_data: studentData,
-                    university_name: universityName,
-                    major: studentData.preferred_major,
-                    mode: 'semi', // Always semi-auto for safety
-                    gemini_api_key: geminiApiKey,
-                    custom_prompt: buildPrompt
-                })
-            });
-
-            const result = await response.json();
-            setAutomationTaskId(result.task_id);
-
-            // Connect WebSocket for progress
-            const ws = new WebSocket(`ws://127.0.0.1:8765/ws/progress/${result.task_id}`);
-            wsRef.current = ws;
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                setAutomationProgress(data);
-                if (['completed', 'error', 'cancelled'].includes(data.status)) {
-                    setIsAutomating(false);
-                    ws.close();
-                }
-            };
-
-            ws.onerror = () => {
-                setAutomationProgress({ status: 'error', progress: 0, message: 'Connection to automation service failed' });
-                setIsAutomating(false);
-            };
-        } catch (error) {
-            setAutomationProgress({ status: 'error', progress: 0, message: `Failed to start: ${error}` });
-            setIsAutomating(false);
+        if (update.status === 'completed') {
+            setTaskStatus('completed');
+            addLog('✓ Application automation completed!', 'success');
+            // Close WebSocket to stop receiving more updates
+            if (wsCleanupRef.current) {
+                wsCleanupRef.current();
+                wsCleanupRef.current = null;
+            }
+        } else if (update.status === 'error') {
+            setTaskStatus('error');
+            addLog(`✗ Error: ${update.message}`, 'error');
+            if (wsCleanupRef.current) {
+                wsCleanupRef.current();
+                wsCleanupRef.current = null;
+            }
         }
     };
 
-    // Confirm submission (semi-auto mode)
-    const confirmSubmission = async (action: 'submit' | 'cancel') => {
-        if (!automationTaskId) return;
-        try {
-            await fetch(`${AUTOMATION_SERVICE_URL}/api/confirm/${automationTaskId}?action=${action}`, { method: 'POST' });
-        } catch (error) {
-            console.error('Confirm error:', error);
+    const handleTaskError = (error: Error) => {
+        if (!isMounted.current) return;
+        setTaskStatus('error');
+        addLog(`✗ Connection error: ${error.message}`, 'error');
+        if (wsCleanupRef.current) {
+            wsCleanupRef.current();
+            wsCleanupRef.current = null;
         }
+    };
+
+    // Start automation - calls API directly, shows progress here
+    const handleStartAutomation = async () => {
+        if (!studentData || !universityName || !buildPrompt) return;
+
+        if (!serviceReady) {
+            addLog('✗ Automation service not ready. Please wait...', 'error');
+            await checkServiceStatus();
+            return;
+        }
+
+        setTaskStatus('running');
+        setLogs([]);
+        addLog(`🚀 Starting application to ${universityName} for ${studentData.full_name}...`, 'system');
+
+        try {
+            // Call the same automation API as AI Browser
+            const response = await startAutomation(buildPrompt);
+
+            addLog(`✓ Task started (ID: ${response.task_id})`, 'success');
+            addLog('📡 Connecting to live updates...', 'info');
+
+            // Connect WebSocket for real-time updates
+            const cleanup = connectToTaskUpdates(
+                response.task_id,
+                handleTaskUpdate,
+                handleTaskError
+            );
+
+            wsCleanupRef.current = cleanup;
+
+        } catch (error) {
+            setTaskStatus('error');
+            addLog(`✗ Failed to start: ${error}`, 'error');
+        }
+    };
+
+    // Stop/cancel automation
+    const handleStop = () => {
+        if (wsCleanupRef.current) {
+            wsCleanupRef.current();
+            wsCleanupRef.current = null;
+        }
+        setTaskStatus('idle');
+        addLog('⏹ Automation stopped', 'system');
     };
 
     if (!studentData) {
@@ -262,182 +327,171 @@ Begin now.`;
 
     return (
         <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-pink-50">
+            {/* Header with student info */}
+            <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-pink-50">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold shadow">
                             {studentData.full_name?.charAt(0) || '?'}
                         </div>
                         <div>
-                            <h3 className="font-bold text-slate-900 text-lg">{studentData.full_name}</h3>
-                            <p className="text-sm text-slate-500">{studentData.preferred_major || 'No major set'} • {studentData.email}</p>
+                            <h3 className="font-bold text-slate-900">{studentData.full_name}</h3>
+                            <p className="text-xs text-slate-500">{studentData.preferred_major || 'No major'} • {studentData.email}</p>
                         </div>
                     </div>
 
-                    {/* Service Status */}
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${serviceStatus === 'running' ? 'bg-green-100 text-green-700' :
-                        serviceStatus === 'stopped' ? 'bg-red-100 text-red-700' :
-                            'bg-slate-100 text-slate-500'
+                    {/* Service status */}
+                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold ${serviceReady ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                         }`}>
-                        <div className={`w-2 h-2 rounded-full ${serviceStatus === 'running' ? 'bg-green-500 animate-pulse' :
-                            serviceStatus === 'stopped' ? 'bg-red-500' : 'bg-slate-400'
-                            }`} />
-                        {serviceStatus === 'running' ? 'AI Ready' : serviceStatus === 'stopped' ? 'Offline' : '...'}
+                        <div className={`w-2 h-2 rounded-full ${serviceReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        {serviceReady ? 'Ready' : 'Offline'}
                     </div>
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-4 gap-2 mt-4">
-                    <div className="bg-white/60 rounded-lg p-2 text-center">
-                        <p className="text-lg font-black text-emerald-600">{studentData.gpa || '—'}</p>
-                        <p className="text-xs text-slate-500">GPA</p>
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                    <div className="bg-white/60 rounded-lg p-1.5 text-center">
+                        <p className="text-sm font-black text-emerald-600">{studentData.gpa || '—'}</p>
+                        <p className="text-[10px] text-slate-500">GPA</p>
                     </div>
-                    <div className="bg-white/60 rounded-lg p-2 text-center">
-                        <p className="text-lg font-black text-violet-600">{studentData.sat_total || '—'}</p>
-                        <p className="text-xs text-slate-500">SAT</p>
+                    <div className="bg-white/60 rounded-lg p-1.5 text-center">
+                        <p className="text-sm font-black text-violet-600">{studentData.sat_total || '—'}</p>
+                        <p className="text-[10px] text-slate-500">SAT</p>
                     </div>
-                    <div className="bg-white/60 rounded-lg p-2 text-center">
-                        <p className="text-lg font-black text-cyan-600">{studentData.ielts_overall || '—'}</p>
-                        <p className="text-xs text-slate-500">IELTS</p>
+                    <div className="bg-white/60 rounded-lg p-1.5 text-center">
+                        <p className="text-sm font-black text-cyan-600">{studentData.ielts_overall || '—'}</p>
+                        <p className="text-[10px] text-slate-500">IELTS</p>
                     </div>
-                    <div className="bg-white/60 rounded-lg p-2 text-center">
-                        <p className="text-lg font-black text-orange-600">{studentData.toefl_total || '—'}</p>
-                        <p className="text-xs text-slate-500">TOEFL</p>
+                    <div className="bg-white/60 rounded-lg p-1.5 text-center">
+                        <p className="text-sm font-black text-orange-600">{studentData.toefl_total || '—'}</p>
+                        <p className="text-[10px] text-slate-500">TOEFL</p>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                {/* API Key Config */}
-                {!geminiApiKey && !showApiKeyInput && (
-                    <button
-                        onClick={() => setShowApiKeyInput(true)}
-                        className="w-full p-4 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100 transition-colors"
-                    >
-                        <div className="flex items-center gap-2 text-amber-700">
-                            <Key className="w-5 h-5" />
-                            <span className="font-bold">Configure Gemini API Key</span>
-                        </div>
-                        <p className="text-xs text-amber-600 mt-1">Required for AI browser automation</p>
-                    </button>
-                )}
-
-                {showApiKeyInput && (
-                    <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-200">
-                        <input
-                            type="password"
-                            value={geminiApiKey}
-                            onChange={(e) => setGeminiApiKey(e.target.value)}
-                            placeholder="Enter your Gemini API Key..."
-                            className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm"
-                        />
-                        <div className="flex gap-2">
-                            <button onClick={() => saveApiKey(geminiApiKey)} className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-bold hover:bg-purple-600">Save</button>
-                            <button onClick={() => setShowApiKeyInput(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-300">Cancel</button>
-                            <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-auto text-sm text-purple-500 hover:underline flex items-center gap-1">
-                                Get Key <ExternalLink className="w-4 h-4" />
-                            </a>
-                        </div>
-                    </div>
-                )}
-
-                {/* University Input */}
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-purple-500" />
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {/* University Input with Autocomplete */}
+                <div className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-purple-500" />
                         University to Apply
+                        {isSearching && <Loader2 className="w-3 h-3 animate-spin text-purple-400" />}
                     </label>
                     <input
                         value={universityName}
-                        onChange={(e) => setUniversityName(e.target.value)}
-                        placeholder="Enter university name (e.g., MIT, Stanford, Harvard)"
-                        disabled={isAutomating}
-                        className="w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 outline-none transition-all"
+                        onChange={(e) => handleUniversitySearch(e.target.value)}
+                        onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        placeholder="Start typing university name..."
+                        disabled={taskStatus === 'running'}
+                        className="w-full px-3 py-2.5 bg-white rounded-xl border-2 border-slate-200 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 outline-none transition-all disabled:opacity-50"
                     />
+
+                    {/* Autocomplete Dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                            {suggestions.map((uni, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => selectUniversity(uni.name)}
+                                    className="w-full px-3 py-2 text-left hover:bg-purple-50 text-sm flex justify-between items-center border-b border-slate-100 last:border-b-0"
+                                >
+                                    <span className="text-slate-800 font-medium truncate">{uni.name}</span>
+                                    <span className="text-xs text-slate-400 ml-2 flex-shrink-0">{uni.country}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Start Button */}
-                <button
-                    onClick={startAutomation}
-                    disabled={isAutomating || !universityName || !geminiApiKey || serviceStatus !== 'running'}
-                    className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
-                >
-                    {isAutomating ? (
-                        <><Loader2 className="w-6 h-6 animate-spin" /> AI is Working...</>
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                    {taskStatus !== 'running' ? (
+                        <button
+                            onClick={handleStartAutomation}
+                            disabled={!universityName || !serviceReady}
+                            className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+                        >
+                            <Sparkles className="w-5 h-5" />
+                            Start Auto-Apply
+                        </button>
                     ) : (
-                        <><Sparkles className="w-6 h-6" /> Start Auto-Apply</>
+                        <button
+                            onClick={handleStop}
+                            className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors shadow-lg"
+                        >
+                            <Square className="w-5 h-5" />
+                            Stop
+                        </button>
                     )}
-                </button>
+                </div>
 
-                {universityName && !isAutomating && (
-                    <p className="text-center text-xs text-slate-400">
-                        AI will fill the {universityName} application form with {studentData.full_name}'s data
-                    </p>
-                )}
-
-                {/* Progress Display */}
-                {automationProgress && (
-                    <div className={`p-4 rounded-xl ${automationProgress.status === 'error' ? 'bg-red-50 border border-red-200' :
-                        automationProgress.status === 'completed' ? 'bg-green-50 border border-green-200' :
-                            'bg-purple-50 border border-purple-200'
+                {/* Status indicator with progress bar */}
+                {taskStatus !== 'idle' && (
+                    <div className={`p-4 rounded-xl ${taskStatus === 'running' ? 'bg-purple-50 border border-purple-200' :
+                        taskStatus === 'completed' ? 'bg-green-50 border border-green-200' :
+                            'bg-red-50 border border-red-200'
                         }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                            {automationProgress.status === 'error' ? (
-                                <AlertCircle className="w-5 h-5 text-red-500" />
-                            ) : automationProgress.status === 'completed' ? (
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                            ) : (
-                                <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
-                            )}
-                            <span className="font-bold text-sm capitalize">{automationProgress.status.replace('_', ' ')}</span>
+                        <div className="flex items-center gap-3 mb-2">
+                            {taskStatus === 'running' && <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />}
+                            {taskStatus === 'completed' && <CheckCircle className="w-5 h-5 text-green-500" />}
+                            {taskStatus === 'error' && <AlertCircle className="w-5 h-5 text-red-500" />}
+                            <span className="font-bold text-sm">
+                                {taskStatus === 'running' ? 'Automation in Progress...' :
+                                    taskStatus === 'completed' ? 'Completed Successfully!' :
+                                        'Error Occurred'}
+                            </span>
                         </div>
-                        <p className="text-sm text-slate-600">{automationProgress.message}</p>
 
-                        {/* Progress Bar */}
-                        {automationProgress.progress > 0 && automationProgress.status !== 'error' && (
-                            <div className="mt-3 h-2 bg-white rounded-full overflow-hidden">
+                        {/* Progress bar */}
+                        {taskStatus === 'running' && (
+                            <div className="w-full bg-purple-100 rounded-full h-2 overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
-                                    style={{ width: `${automationProgress.progress}%` }}
+                                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse"
+                                    style={{
+                                        width: '100%',
+                                        animation: 'progress-indeterminate 2s ease-in-out infinite'
+                                    }}
                                 />
                             </div>
                         )}
 
-                        {/* Account Credentials */}
-                        {automationProgress.account_credentials && (
-                            <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
-                                <p className="text-xs font-bold text-purple-600 uppercase mb-2">🔐 Portal Account Created</p>
-                                <p className="text-sm font-mono"><strong>Email:</strong> {automationProgress.account_credentials.email}</p>
-                                <p className="text-sm font-mono"><strong>Password:</strong> {automationProgress.account_credentials.password}</p>
-                            </div>
-                        )}
-
-                        {/* Confirm Buttons for Semi-Auto */}
-                        {automationProgress.status === 'awaiting_confirmation' && (
-                            <div className="mt-4 flex gap-2">
-                                <button
-                                    onClick={() => confirmSubmission('submit')}
-                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition-colors"
-                                >
-                                    ✓ Submit Application
-                                </button>
-                                <button
-                                    onClick={() => confirmSubmission('cancel')}
-                                    className="flex-1 py-3 bg-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-300 transition-colors"
-                                >
-                                    Cancel
-                                </button>
+                        {taskStatus === 'completed' && (
+                            <div className="w-full bg-green-100 rounded-full h-2 overflow-hidden">
+                                <div className="h-full bg-green-500 rounded-full w-full" />
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* Status Messages */}
-                {serviceStatus === 'stopped' && (
-                    <div className="p-4 bg-red-50 rounded-xl text-sm text-red-700 border border-red-200">
-                        <strong>⚠️ AI Service Offline</strong>
-                        <p className="text-xs mt-1">The automation service should start automatically. Try restarting the app.</p>
+                {/* Live Logs */}
+                {logs.length > 0 && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                            <Terminal className="w-3.5 h-3.5" />
+                            Live Feed
+                        </div>
+                        <div className="bg-slate-900 rounded-xl p-3 max-h-48 overflow-y-auto font-mono text-xs">
+                            {logs.map((log, i) => (
+                                <div key={i} className={`py-0.5 ${log.type === 'error' ? 'text-red-400' :
+                                    log.type === 'success' ? 'text-green-400' :
+                                        log.type === 'system' ? 'text-purple-400' :
+                                            'text-slate-300'
+                                    }`}>
+                                    <span className="text-slate-500">[{log.timestamp}]</span> {log.message}
+                                </div>
+                            ))}
+                            <div ref={logsEndRef} />
+                        </div>
+                    </div>
+                )}
+
+                {/* Service offline warning */}
+                {!serviceReady && (
+                    <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-700 border border-amber-200">
+                        <strong>⚠️ Service Offline</strong>
+                        <p className="mt-0.5">Automation service is not running. It should start automatically with the app.</p>
                     </div>
                 )}
             </div>

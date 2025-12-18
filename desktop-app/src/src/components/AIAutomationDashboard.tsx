@@ -94,6 +94,9 @@ export default function AIAutomationDashboard() {
         isMounted.current = true;
         checkEngineStatus();
 
+        // Check for pending task from Auto-Apply
+        checkPendingTask();
+
         return () => {
             isMounted.current = false;
             // Clean up WebSocket connection
@@ -107,6 +110,91 @@ export default function AIAutomationDashboard() {
     useEffect(() => {
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
+
+    // Check for pending task from Auto-Apply page
+    const checkPendingTask = () => {
+        const pendingTask = localStorage.getItem('pending_ai_task');
+        const autoStart = localStorage.getItem('pending_ai_task_autostart');
+
+        if (pendingTask) {
+            console.log('[AIBrowser] Found pending task from Auto-Apply');
+            setTaskInput(pendingTask);
+            addLog('📋 Loaded application task from Auto-Apply', 'info');
+
+            // Clear the pending task from localStorage
+            localStorage.removeItem('pending_ai_task');
+            localStorage.removeItem('pending_ai_task_autostart');
+
+            // If autostart is set, wait for engine and start
+            if (autoStart === 'true') {
+                addLog('⏳ Waiting for engine to start automation...', 'system');
+                // Will auto-start once engine is ready (handled in checkEngineStatus)
+                waitForEngineAndStart(pendingTask);
+            }
+        }
+    };
+
+    // Wait for engine to be ready then auto-start
+    const waitForEngineAndStart = async (task: string) => {
+        // Wait a bit for engine status to be checked
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Check if engine is ready
+        const running = await isServiceRunning();
+        if (running && isMounted.current) {
+            addLog('🚀 Auto-starting application automation...', 'success');
+            // Trigger the run task with the pending task
+            setTaskInput(task);
+            setTimeout(() => {
+                if (isMounted.current) {
+                    handleRunTaskWithInput(task);
+                }
+            }, 500);
+        } else {
+            addLog('⚠️ Engine not ready - please click Run Task when ready', 'info');
+        }
+    };
+
+    // Run task with specific input (for auto-start)
+    const handleRunTaskWithInput = async (input: string) => {
+        if (!input.trim()) {
+            addLog('✗ No task to run', 'error');
+            return;
+        }
+
+        if (engineStatus !== 'ready') {
+            addLog('✗ Automation engine is not ready yet, please wait...', 'error');
+            return;
+        }
+
+        setTaskStatus('running');
+        clearLogs();
+        addLog(`🚀 Starting task: ${input.substring(0, 100)}...`, 'system');
+
+        try {
+            const response = await startAutomation(input);
+            setCurrentTaskId(response.task_id);
+
+            addLog(`✓ Task started with ID: ${response.task_id}`, 'success');
+            addLog('📡 Connecting to live feed...', 'info');
+
+            const cleanup = connectToTaskUpdates(
+                response.task_id,
+                handleTaskUpdate,
+                handleTaskError
+            );
+
+            wsCleanupRef.current = cleanup;
+
+        } catch (error) {
+            const automationError = error as AutomationError;
+
+            if (!isMounted.current) return;
+
+            setTaskStatus('error');
+            addLog(`✗ Failed to start task: ${automationError.message || 'Unknown error'}`, 'error');
+        }
+    };
 
     // =============================================================================
     // ENGINE STATUS

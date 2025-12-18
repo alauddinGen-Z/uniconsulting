@@ -29,6 +29,8 @@
         "build:teacher": "npm run clean && npm run download-python && npm run build-python && npm run build-automation && npm run build-react && npm run verify:build && electron-builder -c electron-builder-teacher.yml --win"
     },
     "dependencies": {
+        "@powersync/web": "^1.30.0",
+        "@tanstack/react-virtual": "^3.13.13",
         "electron-store": "^8.1.0",
         "electron-updater": "^6.1.7"
     },

@@ -1,13 +1,19 @@
-// Supabase Edge Function: AI Essay Review (Coach Mode)
-// Uses Google Gemini to provide coaching feedback on essays
-// Deploy with: supabase functions deploy ai-review
+/**
+ * ai-review/index.ts
+ * Secure AI Essay Review Edge Function
+ * 
+ * CoVe Guarantees:
+ *   ✅ Cost Defense: GenAI initialized ONLY after auth passes
+ *   ✅ Import Safety: Using esm.sh, no npm: specifiers
+ *   ✅ Data Leakage: Essay content NEVER logged
+ */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.0";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
 
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// ============================================
+// TYPES
+// ============================================
 
 interface ReviewRequest {
     content: string;
@@ -15,254 +21,252 @@ interface ReviewRequest {
     wordLimit?: number;
 }
 
-interface AIFeedback {
-    overallScore: number;
-    overallComment: string;
-    strengths?: { point: string; explanation: string }[];
-    improvements?: { issue: string; suggestion: string; priority: string }[];
-    structure?: { score: number; feedback: string };
-    voice?: { score: number; feedback: string };
-    impact?: { score: number; feedback: string };
-    grammarIssues?: { text: string; suggestion: string }[];
-    coachingPrompts?: string[];
-    pickupTestFlags?: { sentence: string; reason: string }[];
-    rawFeedback?: string;
+interface ReviewResponse {
+    score: number;
+    critique: string[];
+    improvements: string[];
 }
 
-serve(async (req: Request) => {
-    console.log("=== AI Essay Review Function Called ===");
+interface ErrorResponse {
+    error: string;
+    code?: string;
+}
 
-    // Handle CORS preflight
+// ============================================
+// CORS HEADERS
+// ============================================
+
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+// ============================================
+// MAIN HANDLER
+// ============================================
+
+Deno.serve(async (req: Request): Promise<Response> => {
+    // ============================================
+    // CORS: Handle preflight immediately
+    // ============================================
+
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    // Only allow POST
+    if (req.method !== "POST") {
+        return jsonResponse({ error: "Method not allowed" }, 405);
+    }
+
     try {
-        const { content, essayType, wordLimit }: ReviewRequest = await req.json();
+        // ============================================
+        // SECURITY LAYER 1: Extract Authorization
+        // ============================================
 
-        if (!content || content.trim().length < 50) {
-            return new Response(
-                JSON.stringify({ error: "Essay content must be at least 50 characters" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+        const authHeader = req.headers.get("Authorization");
+
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            console.warn("[AI-Review] Missing or invalid Authorization header");
+            return jsonResponse({ error: "Unauthorized", code: "NO_TOKEN" }, 401);
         }
 
-        const geminiKey = Deno.env.get("GEMINI_API_KEY");
-        if (!geminiKey) {
-            return new Response(
-                JSON.stringify({ error: "AI service not configured" }),
-                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+        const token = authHeader.replace("Bearer ", "");
+
+        // ============================================
+        // SECURITY LAYER 2: Validate User with Supabase
+        // CRITICAL: This happens BEFORE GenAI initialization
+        // ============================================
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+            console.error("[AI-Review] Missing Supabase configuration");
+            return jsonResponse({ error: "Server configuration error" }, 500);
         }
 
-        // Coach Mode Prompt - focuses on guiding rather than rewriting
-        const coachPrompt = `You are an expert college admissions essay COACH (not a rewriter).
-Your role is to help students improve their essays by asking the right questions and pointing out areas for improvement.
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            global: {
+                headers: { Authorization: `Bearer ${token}` },
+            },
+        });
 
-CRITICAL RULES:
-1. NEVER rewrite sentences for the student - instead, ask prompting questions
-2. Focus on the "SHOW, DON'T TELL" principle - flag statements that tell instead of showing
-3. Apply the "PICKUP TEST" - flag generic sentences that any student could have written
-4. Be encouraging but honest
-5. Prioritize improvements by impact
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-Essay Type: ${essayType || 'Common App'}
-Word Limit: ${wordLimit || 650}
+        // THE WALLET PROTECTOR: Block before AI initialization
+        if (authError || !user) {
+            console.warn("[AI-Review] Auth failed:", authError?.message || "No user");
+            return jsonResponse({ error: "Unauthorized", code: "INVALID_TOKEN" }, 401);
+        }
 
-STUDENT'S ESSAY:
+        console.log("[AI-Review] Authenticated user:", user.id);
+
+        // ============================================
+        // PARSE REQUEST BODY
+        // ============================================
+
+        let requestBody: ReviewRequest;
+
+        try {
+            requestBody = await req.json();
+        } catch {
+            return jsonResponse({ error: "Invalid JSON body" }, 400);
+        }
+
+        const { content, essayType = "Personal Statement", wordLimit = 650 } = requestBody;
+
+        // Validate content exists and has minimum length
+        if (!content || typeof content !== "string") {
+            return jsonResponse({ error: "Essay content is required" }, 400);
+        }
+
+        if (content.trim().length < 50) {
+            return jsonResponse({ error: "Essay must be at least 50 characters" }, 400);
+        }
+
+        if (content.length > 50000) {
+            return jsonResponse({ error: "Essay too long (max 50,000 characters)" }, 400);
+        }
+
+        // ============================================
+        // AI INITIALIZATION (Only after auth passes)
+        // ============================================
+
+        const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+        if (!geminiApiKey) {
+            console.error("[AI-Review] Missing GEMINI_API_KEY");
+            return jsonResponse({ error: "AI service not configured" }, 500);
+        }
+
+        // GenAI client initialized ONLY HERE - after all auth checks
+        const genAI = new GoogleGenerativeAI(geminiApiKey);
+
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-pro",
+            systemInstruction: `You are a Strict University Admissions Officer reviewing college application essays. 
+Analyze this essay for:
+1. LOGIC: Is the argument coherent and well-structured?
+2. TONE: Is the voice authentic and appropriate for a college application?
+3. IMPACT: Will this essay be memorable to an admissions committee?
+
+Be critical but constructive. Your feedback should help the student improve.
+Provide specific, actionable feedback referencing parts of the essay.`,
+        });
+
+        // ============================================
+        // AI CALL WITH STRUCTURED OUTPUT
+        // ============================================
+
+        const prompt = `
+Analyze the following ${essayType} essay (target: ${wordLimit} words).
+
+ESSAY:
 """
 ${content}
 """
 
-Analyze this essay and return a JSON response in this EXACT format:
+Respond with a JSON object in this exact format:
 {
-    "overallScore": 7,
-    "overallComment": "Your essay shows promise with [strength], but needs work on [area]. Let's dig deeper.",
-    "structure": {
-        "score": 7,
-        "feedback": "Brief feedback on essay structure and flow"
-    },
-    "voice": {
-        "score": 6,
-        "feedback": "Brief feedback on authenticity and personal voice"
-    },
-    "impact": {
-        "score": 7,
-        "feedback": "Brief feedback on memorability and emotional impact"
-    },
-    "strengths": [
-        {
-            "point": "Strong opening hook",
-            "explanation": "Why this works well"
-        }
-    ],
-    "improvements": [
-        {
-            "issue": "This section could be more specific",
-            "suggestion": "Instead of telling us you're a leader, can you describe a specific moment where you demonstrated leadership? What did you do? How did it feel?",
-            "priority": "high"
-        }
-    ],
-    "pickupTestFlags": [
-        {
-            "sentence": "The exact generic sentence from the essay",
-            "reason": "Why this fails the pickup test and how to make it unique"
-        }
-    ],
-    "coachingPrompts": [
-        "What specific moment made you passionate about this?",
-        "Can you describe what you saw, heard, or felt in that experience?",
-        "What would your best friend say about this experience?"
-    ],
-    "grammarIssues": [
-        {
-            "text": "Incorrect text",
-            "suggestion": "Corrected version"
-        }
-    ]
+  "score": <number 0-100>,
+  "critique": [<string>, <string>, ...],
+  "improvements": [<string>, <string>, ...]
 }
 
-SCORING GUIDE (1-10):
-- 9-10: Exceptional, publication-worthy
-- 7-8: Strong, minor improvements needed
-- 5-6: Good foundation, significant improvements needed
-- 3-4: Needs major rework
-- 1-2: Start from scratch
+SCORING GUIDE:
+- 90-100: Exceptional, publish-worthy
+- 80-89: Strong, minor tweaks needed
+- 70-79: Good foundation, needs work
+- 60-69: Average, significant improvements needed
+- Below 60: Needs major revision
 
-SHOW DON'T TELL EXAMPLES:
-- BAD: "I am a natural leader" (telling)
-- GOOD: "When our project deadline loomed, I gathered the team at 6 AM..." (showing)
-
-PICKUP TEST:
-A sentence fails if any other applicant could have written it. It should be SO SPECIFIC that it could ONLY come from this student's life.
-
+Provide 3-5 critique points and 3-5 specific improvement suggestions.
 Return ONLY the JSON object, no other text.`;
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: coachPrompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 4096
-                    }
-                }),
-            }
-        );
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+            },
+        });
 
-        const result = await response.json();
+        const responseText = result.response.text();
 
-        if (result.error) {
-            console.error("Gemini API Error:", result.error);
-            return new Response(
-                JSON.stringify({ error: result.error.message || "AI service error" }),
-                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
+        // ============================================
+        // PARSE AND VALIDATE AI RESPONSE
+        // ============================================
 
-        const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        console.log("Raw Gemini response:", text.substring(0, 500));
+        let feedback: ReviewResponse;
 
-        // Parse JSON from response - handle various formats
-        let feedback: AIFeedback;
         try {
-            // Step 1: Clean up the response - remove markdown code blocks if present
-            let cleanedText = text.trim();
-            console.log("Original text length:", cleanedText.length);
+            // Clean potential markdown wrapping
+            let cleanedText = responseText.trim();
+            cleanedText = cleanedText.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
 
-            // Remove ```json ... ``` or ``` ... ``` wrappers
-            cleanedText = cleanedText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
+            feedback = JSON.parse(cleanedText);
 
-            // Also remove any leading/trailing backticks
-            cleanedText = cleanedText.replace(/^`+/, '').replace(/`+$/, '');
+            // Validate structure
+            if (typeof feedback.score !== "number") {
+                feedback.score = 50;
+            }
+            feedback.score = Math.max(0, Math.min(100, Math.round(feedback.score)));
 
-            // Step 2: Find the outermost JSON object using bracket counting
-            let jsonStr = '';
-            let braceCount = 0;
-            let inString = false;
-            let escapeNext = false;
-            let startIndex = -1;
-
-            for (let i = 0; i < cleanedText.length; i++) {
-                const char = cleanedText[i];
-
-                if (escapeNext) {
-                    escapeNext = false;
-                    continue;
-                }
-
-                if (char === '\\' && inString) {
-                    escapeNext = true;
-                    continue;
-                }
-
-                if (char === '"' && !escapeNext) {
-                    inString = !inString;
-                }
-
-                if (!inString) {
-                    if (char === '{') {
-                        if (braceCount === 0) {
-                            startIndex = i;
-                        }
-                        braceCount++;
-                    } else if (char === '}') {
-                        braceCount--;
-                        if (braceCount === 0 && startIndex !== -1) {
-                            jsonStr = cleanedText.substring(startIndex, i + 1);
-                            break;
-                        }
-                    }
-                }
+            if (!Array.isArray(feedback.critique)) {
+                feedback.critique = ["Analysis unavailable"];
+            }
+            if (!Array.isArray(feedback.improvements)) {
+                feedback.improvements = ["Please try again"];
             }
 
-            if (jsonStr) {
-                console.log("Found JSON object, length:", jsonStr.length);
-                feedback = JSON.parse(jsonStr);
+        } catch (parseError) {
+            // DATA LEAKAGE PREVENTION: Never log the essay content
+            console.error("[AI-Review] JSON parse failed:",
+                parseError instanceof Error ? parseError.message : "Unknown parse error"
+            );
 
-                // Validate and fix required fields
-                if (typeof feedback.overallScore !== 'number') {
-                    feedback.overallScore = 5;
-                }
-                // Clamp score to 1-10
-                feedback.overallScore = Math.max(1, Math.min(10, Math.round(feedback.overallScore)));
-
-                if (!feedback.overallComment || typeof feedback.overallComment !== 'string') {
-                    feedback.overallComment = "Review completed.";
-                }
-
-                // Ensure arrays exist
-                if (!Array.isArray(feedback.strengths)) feedback.strengths = [];
-                if (!Array.isArray(feedback.improvements)) feedback.improvements = [];
-                if (!Array.isArray(feedback.coachingPrompts)) feedback.coachingPrompts = [];
-
-                console.log("Successfully parsed feedback with score:", feedback.overallScore);
-            } else {
-                throw new Error("No valid JSON object found in response");
-            }
-        } catch (e: any) {
-            console.log("JSON parse failed:", e.message, "Using raw feedback");
-            // Fallback: store raw but don't show as garbage
+            // Fallback response
             feedback = {
-                overallScore: 5,
-                overallComment: "AI analysis complete. Please see the detailed feedback below.",
-                rawFeedback: text.replace(/```json?\s*/gi, '').replace(/```/g, '').trim()
+                score: 50,
+                critique: ["AI analysis encountered an issue. Please try again."],
+                improvements: ["Ensure your essay is complete and well-formatted."],
             };
         }
 
-        return new Response(
-            JSON.stringify({ feedback }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        // ============================================
+        // SUCCESS RESPONSE
+        // ============================================
+
+        console.log("[AI-Review] Success for user:", user.id, "Score:", feedback.score);
+
+        return jsonResponse(feedback, 200);
+
+    } catch (error) {
+        // CRITICAL: Never log essay content, only error metadata
+        console.error("[AI-Review] Unhandled error:",
+            error instanceof Error ? error.message : "Unknown error"
         );
 
-    } catch (error: any) {
-        console.error("AI Review Error:", error.message);
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({
+            error: "AI review failed. Please try again.",
+            code: "AI_ERROR"
+        }, 500);
     }
 });
+
+// ============================================
+// HELPER: JSON Response with CORS
+// ============================================
+
+function jsonResponse(data: ReviewResponse | ErrorResponse, status: number): Response {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+        },
+    });
+}

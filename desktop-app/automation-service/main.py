@@ -173,7 +173,13 @@ async def run_task(request: TaskRequest):
 
 @app.post("/api/apply")
 async def start_application(request: ApplicationRequest):
-    """Start a university application automation task"""
+    """
+    Start a university application automation task.
+    
+    ARCHITECTURE FIX: Uses run_automation_task() which manually launches Chrome
+    and connects via CDP. This bypasses browser-use's Playwright-based launch
+    which fails in PyInstaller compiled executables.
+    """
     task_id = str(uuid.uuid4())
     
     # Get API key from request or environment
@@ -181,23 +187,41 @@ async def start_application(request: ApplicationRequest):
     if not api_key:
         raise HTTPException(status_code=400, detail="GEMINI_API_KEY not configured")
     
+    # Set API key in environment for run_automation_task to use
+    os.environ["GEMINI_API_KEY"] = api_key
+    
+    # Build task description from custom_prompt or create one
+    if request.custom_prompt:
+        task_description = request.custom_prompt
+    else:
+        # Fallback: Build basic task from request data
+        student = request.student_data
+        task_description = f"""Apply to {request.university_name} for student:
+Name: {student.get('full_name', 'Unknown')}
+Email: {student.get('email', 'Unknown')}
+Major: {request.major or student.get('preferred_major', 'Undeclared')}
+
+Fill all application form fields with student information and STOP before final submit."""
+    
     # Store task info
     active_tasks[task_id] = {
         "status": "queued",
         "progress": 0,
-        "request": request.model_dump(),
+        "description": task_description,
         "created_at": datetime.now().isoformat(),
-        "messages": [],
+        "messages": ["Task queued"],
         "account_credentials": None
     }
     
-    # Start automation with asyncio.create_task (non-blocking, works with async browser-use)
-    import asyncio
+    logger.info(f"[{task_id}] Starting application for {request.university_name}")
+    
+    # Use run_automation_task which manually launches Chrome (works in PyInstaller)
     asyncio.create_task(
-        run_application_automation(
-            task_id,
-            request,
-            api_key
+        run_automation_task(
+            task_id=task_id,
+            task_description=task_description,
+            active_tasks=active_tasks,
+            websocket_connections=websocket_connections
         )
     )
     
@@ -304,6 +328,11 @@ async def run_application_automation(task_id: str, request: ApplicationRequest, 
             mode=request.mode,
             custom_prompt=request.custom_prompt
         )
+        
+        # Check if agent failed (e.g., browser-use not available)
+        if not result.get("success", True):
+            await update_progress("error", 0, result.get("message", "Agent failed"))
+            return
         
         if result.get("account_created"):
             task["account_credentials"] = result["account_created"]

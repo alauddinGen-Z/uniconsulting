@@ -1,0 +1,6 @@
+{
+    "imports": {
+        "@google/generative-ai": "https://esm.sh/@google/generative-ai@0.21.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.0"
+    }
+}

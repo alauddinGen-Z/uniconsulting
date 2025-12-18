@@ -6,14 +6,26 @@
  */
 
 // ============================================
+// AGENCY TYPES (Multi-tenant)
+// ============================================
+
+export interface Agency {
+    id: string;
+    name: string;
+    domain: string | null;
+    created_at: string;
+}
+
+// ============================================
 // USER & PROFILE TYPES
 // ============================================
 
-export type UserRole = 'student' | 'teacher';
+export type UserRole = 'owner' | 'teacher' | 'student';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Profile {
     id: string;
+    agency_id: string | null; // Multi-tenant: links to agencies table
     role: UserRole;
     full_name: string | null;
     email: string | null;
@@ -48,6 +60,7 @@ export type DocumentType = 'passport' | 'diploma' | 'transcript' | 'certificate'
 
 export interface Document {
     id: string;
+    agency_id: string | null; // Multi-tenant
     student_id: string;
     type: DocumentType;
     file_name: string;
@@ -62,6 +75,7 @@ export interface Document {
 
 export interface Essay {
     id: string;
+    agency_id: string | null; // Multi-tenant
     student_id: string;
     title: string;
     content: string;
@@ -141,6 +155,32 @@ export interface Message {
     content: string;
     is_announcement: boolean;
     created_at: string;
+}
+
+// ============================================
+// STUDENT TYPES (Agency-scoped)
+// ============================================
+
+export type StudentStatus = 'active' | 'inactive' | 'graduated';
+export type StudentApplicationStatus = 'researching' | 'preparing' | 'submitted' | 'accepted' | 'rejected' | 'waitlisted';
+
+export interface Student {
+    id: string;
+    agency_id: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    status: StudentStatus;
+    application_status: StudentApplicationStatus;
+    teacher_id: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface StudentWithTeacher extends Student {
+    teacher?: Pick<Profile, 'id' | 'full_name' | 'email'>;
 }
 
 // ============================================

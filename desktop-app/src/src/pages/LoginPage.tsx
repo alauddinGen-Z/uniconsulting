@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAppStore } from '../store/appStore';
 import { Mail, Lock, LogIn, Loader2, ExternalLink } from 'lucide-react';
 
 // Electron API type declaration
@@ -21,7 +20,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { loadUserProfile } = useAppStore();
 
     // Listen for auth from deep link (Electron)
     useEffect(() => {
@@ -31,11 +29,10 @@ export default function LoginPage() {
         if (window.electronAPI?.onAuthSuccess) {
             window.electronAPI.onAuthSuccess(async (data: { token: string; email: string }) => {
                 console.log('[Login] Auth received from deep link:', data.email);
-                // Session is already set by website, just reload profile
-                await loadUserProfile();
+                // App.tsx onAuthStateChange will handle the session change
             });
         }
-    }, [loadUserProfile]);
+    }, []);
 
     const handleBrowserLogin = async () => {
         // Open desktop auth page - auto-redirects if already logged in
@@ -55,21 +52,27 @@ export default function LoginPage() {
         setError(null);
 
         try {
-            const { error: authError } = await supabase.auth.signInWithPassword({
+            console.log('[Login] Attempting sign in for:', email);
+            const { data, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password
             });
 
-            if (authError) throw authError;
+            if (authError) {
+                console.error('[Login] Auth error:', authError.message);
+                throw authError;
+            }
 
-            // Reload user profile after login
-            await loadUserProfile();
+            console.log('[Login] Sign in successful for:', data.user?.email);
+            // App.tsx onAuthStateChange will handle the rest (profile loading, navigation)
+            // Just keep loading state true - App.tsx will set isLoading=false when done
+
         } catch (err: any) {
             console.error('[Login] Error:', err);
             setError(err.message || 'Login failed');
-        } finally {
             setIsLoading(false);
         }
+        // Don't set isLoading false on success - let App.tsx handle it
     };
 
     return (

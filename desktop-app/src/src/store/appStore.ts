@@ -151,7 +151,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
     },
 
-    // Load messages
+    // Load messages - NOTE: Messaging uses conversation-based architecture
+    // Desktop app doesn't need global message loading - individual chat components handle this
     loadMessages: async () => {
         const { user } = get();
         if (!user) {
@@ -159,24 +160,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             return;
         }
 
-        try {
-            console.log('[AppStore] Loading messages for user:', user.id);
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*')
-                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                console.error('[AppStore] Error loading messages:', error.message);
-                return;
-            }
-
-            console.log('[AppStore] Loaded', data?.length || 0, 'messages');
-            set({ messages: (data || []) as Message[] });
-        } catch (error) {
-            console.error('[AppStore] Exception in loadMessages:', error);
-        }
+        // Desktop app uses conversation-based messaging
+        // Messages are loaded per-conversation in chat components, not globally
+        console.log('[AppStore] Messages will be loaded per-conversation');
+        set({ messages: [] });
     },
 
     // Logout

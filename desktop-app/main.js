@@ -373,9 +373,16 @@ function createMainWindow() {
         }
     });
 
-    if (isDev) {
-        mainWindow.webContents.openDevTools();
-    }
+    // Always enable DevTools for debugging (can be disabled later)
+    // Press F12 or Ctrl+Shift+I to open
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+            mainWindow.webContents.toggleDevTools();
+        }
+    });
+
+    // Auto-open DevTools for debugging login issue
+    mainWindow.webContents.openDevTools();
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url.includes('localhost') || url.includes('uniconsulting') || url.includes('supabase')) {
@@ -776,6 +783,7 @@ async function startAutomationService() {
             env: {
                 ...process.env,
                 PYTHONUNBUFFERED: '1',
+                PYTHONDONTWRITEBYTECODE: '1', // Prevent stale bytecode cache issues
             },
             detached: false,
             stdio: ['ignore', 'pipe', 'pipe']

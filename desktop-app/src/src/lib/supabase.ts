@@ -148,6 +148,76 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
 
 console.log('[Supabase] Client initialized with ElectronIPCStorage adapter');
 
+/**
+ * CRITICAL: Restore session from IPC storage on app start
+ * This function should be called when the app mounts to ensure
+ * the session is restored from persistent storage
+ */
+export async function restoreSessionFromIPC(): Promise<boolean> {
+    if (typeof window === 'undefined' || !window.electron?.isDesktop) {
+        console.log('[Supabase] Not in Electron, skipping IPC restore');
+        return false;
+    }
+
+    try {
+        // Timeout to prevent hanging
+        const timeoutPromise = new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('IPC timeout')), 3000)
+        );
+
+        const tokenPromise = window.electron.getAuthToken();
+        const stored = await Promise.race([tokenPromise, timeoutPromise]);
+
+        if (stored?.token && stored?.refreshToken) {
+            console.log('[Supabase] Restoring session from IPC for:', stored.email);
+
+            // Try to set session with stored tokens
+            const { error } = await supabase.auth.setSession({
+                access_token: stored.token,
+                refresh_token: stored.refreshToken
+            });
+
+            if (error) {
+                console.error('[Supabase] Failed to restore session:', error.message);
+
+                // If token is expired/invalid, try to refresh using refresh token
+                if (error.message.includes('expired') || error.message.includes('invalid')) {
+                    console.log('[Supabase] Token expired, attempting refresh...');
+
+                    const { error: refreshError } = await supabase.auth.refreshSession({
+                        refresh_token: stored.refreshToken
+                    });
+
+                    if (refreshError) {
+                        console.error('[Supabase] Refresh failed, clearing stored session:', refreshError.message);
+                        // Clear the invalid session from storage
+                        await window.electron.logout();
+                        return false;
+                    }
+
+                    console.log('[Supabase] Session refreshed successfully');
+                    return true;
+                }
+
+                // Clear invalid session
+                await window.electron.logout();
+                return false;
+            }
+
+            console.log('[Supabase] Session restored successfully for:', stored.email);
+            return true;
+        }
+    } catch (error) {
+        console.error('[Supabase] Session restoration error:', error);
+        // Clear potentially corrupt session
+        try {
+            await window.electron?.logout();
+        } catch { }
+    }
+
+    return false;
+}
+
 // Gemini API Key - should be set via UI settings (stored in localStorage)
 // DO NOT HARDCODE API KEYS HERE
 export const getGeminiApiKey = (): string => {
@@ -158,3 +228,4 @@ export const getGeminiApiKey = (): string => {
 };
 
 export default supabase;
+

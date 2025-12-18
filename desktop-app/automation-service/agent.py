@@ -27,6 +27,9 @@ else:
 from dotenv import load_dotenv
 load_dotenv(BASE_DIR / '.env')
 
+# Import utility functions for page accessibility checks
+from utils import has_cloudflare_protection, check_page_accessibility
+
 
 # Try importing browser-use components
 # Note: browser-use 0.11.x renamed BrowserConfig to BrowserProfile
@@ -435,27 +438,29 @@ async def run_automation_task(
         )
         
         logger.info(f"[{task_id}] Native ChatGoogle LLM initialized")
-        await update_progress("initializing", 10, "Starting browser (visible mode)...")
+        await update_progress("initializing", 10, "Starting Chrome browser (visible mode)...")
         
-        # Find system Chrome executable
+        # FORCE Chrome only - no Edge fallback
+        # Priority: x86 path first (common on 64-bit Windows with 32-bit Chrome)
         chrome_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
         ]
         
-        chrome_exe = None
+        browser_exe = None
+        browser_name = "Chrome"
         for path in chrome_paths:
             if os.path.exists(path):
-                chrome_exe = path
-                logger.info(f"[{task_id}] Found Chrome at: {chrome_exe}")
+                browser_exe = path
+                logger.info(f"[{task_id}] Found Chrome at: {browser_exe}")
                 break
         
-        if not chrome_exe:
-            await update_progress("error", 0, "Chrome not found. Please install Google Chrome.")
+        if not browser_exe:
+            await update_progress("error", 0, "Google Chrome not found. Please install Chrome from https://www.google.com/chrome/")
             return
         
-        # Launch Chrome manually with remote debugging
+        # Launch Chrome with remote debugging
         import subprocess
         import socket
         import httpx
@@ -467,37 +472,37 @@ async def run_automation_task(
                 return s.getsockname()[1]
         
         debug_port = find_free_port()
-        user_data_dir = os.path.join(os.environ.get('TEMP', '/tmp'), f'uniconsulting_chrome_{debug_port}')
+        user_data_dir = os.path.join(os.environ.get('TEMP', '/tmp'), f'uniconsulting_browser_{debug_port}')
         
-        await update_progress("initializing", 15, f"Launching Chrome on port {debug_port}...")
+        await update_progress("initializing", 15, f"Launching {browser_name} on port {debug_port}...")
         
-        # Start Chrome with remote debugging and NO PROXY
-        chrome_args = [
-            chrome_exe,
+        # Start browser with remote debugging and NO PROXY
+        browser_args = [
+            browser_exe,
             f'--remote-debugging-port={debug_port}',
             f'--user-data-dir={user_data_dir}',
             '--no-first-run',
             '--no-default-browser-check',
-            '--no-proxy-server',  # CRITICAL: Disable proxy for Chrome
+            '--no-proxy-server',  # CRITICAL: Disable proxy
             '--disable-background-networking',
             'about:blank',  # Open with a blank page
         ]
         
-        logger.info(f"[{task_id}] Launching Chrome with args: {chrome_args}")
+        logger.info(f"[{task_id}] Launching {browser_name} with args: {browser_args}")
         
         try:
-            chrome_process = subprocess.Popen(
-                chrome_args, 
+            browser_process = subprocess.Popen(
+                browser_args, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             )
         except Exception as e:
-            logger.error(f"[{task_id}] Failed to launch Chrome: {e}")
-            await update_progress("error", 0, f"Failed to launch Chrome: {e}")
+            logger.error(f"[{task_id}] Failed to launch {browser_name}: {e}")
+            await update_progress("error", 0, f"Failed to launch {browser_name}: {e}")
             return
         
-        logger.info(f"[{task_id}] Chrome process started with PID: {chrome_process.pid}")
+        logger.info(f"[{task_id}] {browser_name} process started with PID: {browser_process.pid}")
         
         # Create httpx client with NO PROXY (critical for avoiding 502)
         http_client = httpx.Client(trust_env=False, timeout=3)
@@ -520,7 +525,7 @@ async def run_automation_task(
                 elif response.status_code == 502:
                     last_error = f"502 Bad Gateway - proxy may be intercepting"
             except httpx.ConnectError as e:
-                last_error = f"Connection refused (Chrome may still be starting)"
+                last_error = f"Connection refused ({browser_name} may still be starting)"
                 logger.debug(f"[{task_id}] {last_error}")
             except Exception as e:
                 last_error = str(e)
@@ -530,8 +535,8 @@ async def run_automation_task(
         
         if not cdp_url:
             logger.error(f"[{task_id}] Failed to get CDP URL. Last error: {last_error}")
-            chrome_process.terminate()
-            await update_progress("error", 0, f"Failed to connect to Chrome CDP: {last_error}")
+            browser_process.terminate()
+            await update_progress("error", 0, f"Failed to connect to {browser_name} CDP: {last_error}")
             return
         
         # Connect browser-use to the running Chrome
@@ -547,8 +552,91 @@ async def run_automation_task(
         
         await update_progress("running", 20, "Executing task...")
         
-        # Create agent with safety guardrail
-        full_task = f"{SAFETY_SYSTEM_PROMPT}\n\n## Your Task:\n{task_description}"
+        # =====================================================================
+        # CLOUDFLARE DETECTION HELPER
+        # =====================================================================
+        async def check_current_page_for_cloudflare(context) -> tuple[bool, str]:
+            """
+            Check the current page for Cloudflare/DDoS protection.
+            
+            Returns:
+                (is_blocked, reason) - True if page is blocked, with reason string
+            """
+            try:
+                # Get the current page from browser context
+                pages = context.pages
+                if not pages:
+                    return False, "No pages loaded"
+                
+                page = pages[-1]  # Get the most recent page
+                
+                # Get page content and response info
+                content = await page.content()
+                
+                # We don't have direct access to status code from playwright page,
+                # so we check content-based detection
+                is_accessible, reason = check_page_accessibility(
+                    status_code=200,  # Assume 200 if page loaded
+                    headers={},  # Headers not easily accessible post-load
+                    html_content=content
+                )
+                
+                if not is_accessible:
+                    return True, reason
+                
+                # Additional content-based checks for common blocking patterns
+                content_lower = content.lower()
+                
+                # Check for Cloudflare challenge page indicators
+                cloudflare_indicators = [
+                    'checking your browser',
+                    'please wait...',
+                    'ddos protection',
+                    'ray id:',
+                    'cf-browser-verification',
+                    '_cf_chl_opt',
+                    'cloudflare',
+                    'just a moment...',
+                    'enable javascript and cookies',
+                ]
+                
+                for indicator in cloudflare_indicators:
+                    if indicator in content_lower:
+                        # Double-check it's not just a mention on a normal page
+                        if len(content) < 50000 and content_lower.count(indicator) > 0:
+                            # Check if title contains blocking message
+                            title_match = content.lower().find('<title>')
+                            if title_match != -1:
+                                title_end = content.lower().find('</title>', title_match)
+                                if title_end != -1:
+                                    title = content[title_match + 7:title_end].lower()
+                                    if any(x in title for x in ['just a moment', 'please wait', 'attention required', 'cloudflare']):
+                                        return True, f"Cloudflare challenge detected: {indicator}"
+                
+                return False, "Page accessible"
+                
+            except Exception as e:
+                logger.warning(f"[{task_id}] Cloudflare check error: {e}")
+                return False, f"Check failed: {e}"
+        
+        # =====================================================================
+        # PRE-FLIGHT CLOUDFLARE CHECK (after browser starts, before agent runs)
+        # =====================================================================
+        
+        # Create agent with safety guardrail + cloudflare awareness
+        cloudflare_instruction = """
+## CLOUDFLARE/PROTECTION DETECTION ##
+If you encounter any of these scenarios, STOP and report immediately:
+- "Checking your browser" page
+- "Please wait" or "Just a moment" interstitial
+- CAPTCHA challenge
+- "Access Denied" or "403 Forbidden" page
+- Any DDoS protection page
+
+Report: "BLOCKED: [type of block detected]" and do NOT continue clicking.
+"""
+        
+        full_task = f"{SAFETY_SYSTEM_PROMPT}\n\n{cloudflare_instruction}\n\n## Your Task:\n{task_description}"
         
         logger.info(f"[{task_id}] Creating agent with task: {task_description[:100]}...")
         
@@ -561,10 +649,50 @@ async def run_automation_task(
         logger.info(f"[{task_id}] Agent created, running...")
         
         # Run the agent
-        await agent.run()
-        
-        logger.info(f"[{task_id}] Agent completed successfully!")
-        await update_progress("completed", 100, "Task completed successfully!")
+        try:
+            history = await agent.run()
+            
+            # =====================================================================
+            # POST-RUN CLOUDFLARE CHECK
+            # =====================================================================
+            try:
+                context = await browser.get_context()
+                if context:
+                    is_blocked, block_reason = await check_current_page_for_cloudflare(context)
+                    if is_blocked:
+                        logger.warning(f"[{task_id}] Cloudflare block detected post-run: {block_reason}")
+                        await update_progress("blocked", 50, f"Page blocked: {block_reason}")
+                        # Don't mark as fully completed if blocked
+                        await browser.stop()
+                        logger.info(f"[{task_id}] Browser stopped due to block")
+                        return
+            except Exception as cf_err:
+                logger.warning(f"[{task_id}] Post-run cloudflare check failed: {cf_err}")
+            
+            # Check if agent reported being blocked
+            if history:
+                try:
+                    # Check final message/result for blocking indicators
+                    result_str = str(history).lower()
+                    if any(x in result_str for x in ['blocked:', 'captcha', 'cloudflare', 'access denied']):
+                        logger.warning(f"[{task_id}] Agent reported blocking in results")
+                        await update_progress("blocked", 75, "Agent detected page protection/blocking")
+                        await browser.stop()
+                        return
+                except:
+                    pass
+            
+            logger.info(f"[{task_id}] Agent completed successfully!")
+            await update_progress("completed", 100, "Task completed successfully!")
+            
+        except Exception as agent_err:
+            error_str = str(agent_err).lower()
+            # Check if the error is related to cloudflare/blocking
+            if any(x in error_str for x in ['cloudflare', 'captcha', 'blocked', '403', '503']):
+                logger.error(f"[{task_id}] Agent blocked by protection: {agent_err}")
+                await update_progress("blocked", 0, f"Blocked by site protection: {agent_err}")
+            else:
+                raise  # Re-raise if not a blocking error
         
         await browser.stop()
         logger.info(f"[{task_id}] Browser stopped")
