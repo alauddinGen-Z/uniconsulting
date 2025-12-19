@@ -15,10 +15,11 @@ import { create } from "zustand";
 
 export interface AppUser {
     id: string;
+    agencyId: string; // NEW: Multi-tenant focus
     name: string;
     email: string;
     avatarUrl: string | null;
-    role: "student" | "teacher";
+    role: "student" | "teacher" | "owner"; // Added owner role
 }
 
 interface AppState {

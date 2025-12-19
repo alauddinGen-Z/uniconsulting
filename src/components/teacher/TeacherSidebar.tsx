@@ -115,18 +115,18 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                     {navItems.map((item) => (
                         <Link
                             key={item.id}
-                            href={`/teacher/${item.id}`}
+                            href={'isAdmin' in item && item.isAdmin ? '/admin' : `/teacher/${item.id}`}
                             prefetch={true}
                             onClick={onMobileClose}
                             onMouseEnter={() => prefetchForTeacherRoute(item.id)}
                             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
                                 ? "bg-brand-primary-600 text-white shadow-lg shadow-brand font-bold"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                                }`}
+                                } ${'isAdmin' in item && item.isAdmin ? 'border border-orange-500/30 hover:border-orange-500' : ''}`}
                         >
                             <div className="flex items-center gap-3 relative z-10">
                                 <div className="relative">
-                                    <item.icon className={`w-5 h-5 ${activeTab === item.id ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`} />
+                                    <item.icon className={`w-5 h-5 ${activeTab === item.id ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"} ${'isAdmin' in item && item.isAdmin ? '!text-orange-400' : ''}`} />
                                     {/* Unread Message Badge */}
                                     {item.id === 'messages' && unreadCount > 0 && (
                                         <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-lg">
@@ -140,6 +140,11 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                                         }`}>
                                         <Sparkles className="w-3 h-3" />
                                         AI
+                                    </span>
+                                )}
+                                {'isAdmin' in item && item.isAdmin && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400 uppercase">
+                                        Owner
                                     </span>
                                 )}
                             </div>

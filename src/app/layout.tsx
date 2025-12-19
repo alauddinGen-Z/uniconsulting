@@ -6,6 +6,7 @@ import { ACTIVE_THEME } from "@/lib/theme-config";
 import { LanguageProvider } from "@/lib/i18n";
 import QueryProvider from "@/providers/QueryProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeApplier } from "@/components/shared/ThemeApplier";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -51,7 +52,9 @@ export default function RootLayout({
         <LanguageProvider>
           <QueryProvider>
             <AuthProvider>
-              {children}
+              <ThemeApplier>
+                {children}
+              </ThemeApplier>
             </AuthProvider>
           </QueryProvider>
           <Toaster position="top-right" />

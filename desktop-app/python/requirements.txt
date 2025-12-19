@@ -1,7 +1,0 @@
-# UniConsulting Automation Agent Dependencies
-# Install with: pip install -r requirements.txt
-
-browser-use>=0.1.0
-langchain-google-genai>=1.0.0
-langchain>=0.1.0
-playwright>=1.40.0

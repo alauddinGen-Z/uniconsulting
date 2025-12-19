@@ -162,17 +162,7 @@ export default function LoginPage() {
 
                 toast.success(`Welcome back, ${userRole}!`);
 
-                // Save auth token to Electron for persistent login
-                if (typeof window !== 'undefined' && (window as any).electron?.saveAuthToken) {
-                    const session = data.session;
-                    if (session) {
-                        (window as any).electron.saveAuthToken({
-                            token: session.access_token,
-                            refreshToken: session.refresh_token,
-                            email: data.user.email
-                        });
-                    }
-                }
+
 
                 // Reset loading state before navigation
                 setIsLoading(false);

@@ -10,12 +10,13 @@
  * @file src/app/teacher/layout.tsx
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import FloatingPendingBadge from "@/components/teacher/FloatingPendingBadge";
 import { TeacherDataProvider } from "@/contexts/TeacherDataContext";
 import { Menu } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { usePrefetch } from "@/hooks/usePrefetch";
 
 export default function TeacherLayout({
     children,
@@ -25,9 +26,17 @@ export default function TeacherLayout({
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const { prefetchTeacherStudents, prefetchPendingStudents } = usePrefetch();
 
     // Extract active tab from pathname
     const activeTab = pathname.split("/").pop() || "home";
+
+    // Aggressive prefetching on layout mount
+    useEffect(() => {
+        // Prefetch critical data when the teacher layout mounts
+        prefetchTeacherStudents();
+        prefetchPendingStudents();
+    }, [prefetchTeacherStudents, prefetchPendingStudents]);
 
     return (
         <TeacherDataProvider>
