@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { actionClient } from "@/lib/safe-action";
-import { createServerClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const registerAgencySchema = z.object({
@@ -15,7 +15,7 @@ const registerAgencySchema = z.object({
 export const registerAgency = actionClient
     .schema(registerAgencySchema)
     .action(async ({ parsedInput }) => {
-        const supabase = await createServerClient();
+        const supabase = await createClient();
 
         // 1. Create the agency
         const { data: agency, error: agencyError } = await supabase
