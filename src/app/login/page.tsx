@@ -168,7 +168,9 @@ export default function LoginPage() {
                 setIsLoading(false);
 
                 // Use replace to prevent back-button returning to login
-                if (userRole === 'teacher') {
+                if (userRole === 'owner') {
+                    router.replace("/admin");
+                } else if (userRole === 'teacher') {
                     router.replace("/teacher/home");
                 } else {
                     router.replace("/student/home");
