@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { ArrowRight, GraduationCap, Users, Upload, Brain, Target, Shield, Zap, Sparkles, ChevronDown, Check, Play, Pause, Monitor, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -47,7 +48,7 @@ export default function Home() {
           className="bg-white/80 backdrop-blur-md border border-white/50 shadow-lg shadow-orange-500/5 rounded-full px-6 py-3 flex items-center gap-8"
         >
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-pink-500 rounded-full flex items-center justify-center text-white font-black text-sm">U</div>
+            <Image src="/logo.png" alt="UNI" width={32} height={32} className="rounded-full" />
             <span className="font-bold tracking-tight">UNI<span className="text-orange-500">CONSULTING</span></span>
           </div>
 

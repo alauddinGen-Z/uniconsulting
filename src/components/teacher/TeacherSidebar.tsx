@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
 import ProfileModal from "@/components/shared/ProfileModal";
 import SettingsModal from "@/components/shared/SettingsModal";
@@ -101,9 +102,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                 <div className="p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
                     <div className="relative z-10 flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center text-white font-black text-xl shadow-brand">
-                            {ACTIVE_THEME.branding.logoIcon}
-                        </div>
+                        <Image src="/logo.png" alt="UNI" width={40} height={40} className="rounded-xl shadow-brand" />
                         <span className="font-black font-montserrat text-2xl tracking-tight text-white">{ACTIVE_THEME.branding.logoText}</span>
                     </div>
                     <p className="text-slate-400 text-xs font-medium ml-1 relative z-10">Teacher Console</p>

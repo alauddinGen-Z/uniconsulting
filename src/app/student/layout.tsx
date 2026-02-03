@@ -18,6 +18,7 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { Menu } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import { usePrefetch } from "@/hooks/usePrefetch";
 
 export default function StudentLayout({
@@ -138,9 +139,7 @@ export default function StudentLayout({
                         <Menu className="w-6 h-6 text-slate-700" />
                     </button>
                     <div className="flex items-center gap-2 ml-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-black text-sm">
-                            U
-                        </div>
+                        <Image src="/logo.png" alt="UNI" width={32} height={32} className="rounded-lg" />
                         <span className="font-bold text-slate-900">UNI</span>
                     </div>
                 </div>
