@@ -1,70 +1,102 @@
--- Fix RLS Infinite Recursion
--- Introduces SECURITY DEFINER functions to bypass RLS for self-referential checks
+-- FINAL IDEMPOTENT RLS RECURSION FIX
+-- Resolves the permanent "login hang" by breaking circular policy dependencies.
 
--- 1. Helper Function: Get My Agency ID
+-- 1. Helper Functions (Non-recursive, Security Definer)
 CREATE OR REPLACE FUNCTION get_my_agency_id()
 RETURNS UUID
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 STABLE
 AS $$
-  SELECT agency_id FROM profiles WHERE id = auth.uid();
+DECLARE
+    v_id UUID;
+BEGIN
+    SELECT agency_id INTO v_id FROM profiles WHERE id = auth.uid() LIMIT 1;
+    RETURN v_id;
+END;
 $$;
 
--- 2. Helper Function: Get My Conversation IDs
-CREATE OR REPLACE FUNCTION get_my_conversation_ids()
-RETURNS TABLE (conversation_id UUID)
-LANGUAGE sql
+CREATE OR REPLACE FUNCTION is_teacher(user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 STABLE
 AS $$
-  SELECT conversation_id FROM conversation_participants WHERE user_id = auth.uid();
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = user_id AND role = 'teacher'
+    );
+END;
 $$;
 
--- 3. Fix Profiles Policy
-DROP POLICY IF EXISTS "Users can view profiles in same agency" ON profiles;
+CREATE OR REPLACE FUNCTION is_teacher()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = auth.uid() AND role = 'teacher'
+    );
+END;
+$$;
 
-CREATE POLICY "Users can view profiles in same agency"
-ON profiles FOR SELECT
-To authenticated
-USING (
-  agency_id = get_my_agency_id()
-  OR id = auth.uid() -- Always allow seeing self
-);
+-- 2. Cleanup all dependent policies
+DROP POLICY IF EXISTS "profiles_select_clean" ON profiles;
+DROP POLICY IF EXISTS "profiles_authenticated_select" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_agency" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_policy" ON profiles;
 
--- 4. Fix Conversation Participants Policy
-DROP POLICY IF EXISTS "Users can view conversation participants" ON conversation_participants;
+DROP POLICY IF EXISTS "essays_select_clean" ON essays;
+DROP POLICY IF EXISTS "essays_update_clean" ON essays;
+DROP POLICY IF EXISTS "essays_select_policy" ON essays;
+DROP POLICY IF EXISTS "essays_update_policy" ON essays;
+DROP POLICY IF EXISTS "RLS_essays_select" ON essays;
+DROP POLICY IF EXISTS "essays_select" ON essays;
+DROP POLICY IF EXISTS "essays_update" ON essays;
 
-CREATE POLICY "Users can view conversation participants"
-ON conversation_participants FOR SELECT
-TO authenticated
-USING (
-    -- User can see rows where they are the user
-    user_id = auth.uid()
-    OR
-    -- OR user can see rows for conversations they are part of
-    conversation_id IN ( SELECT conversation_id FROM get_my_conversation_ids() )
-);
+DROP POLICY IF EXISTS "documents_select_clean" ON documents;
+DROP POLICY IF EXISTS "documents_update_clean" ON documents;
+DROP POLICY IF EXISTS "documents_select_v2" ON documents;
+DROP POLICY IF EXISTS "documents_update_v2" ON documents;
+DROP POLICY IF EXISTS "documents_select_policy" ON documents;
+DROP POLICY IF EXISTS "documents_update_policy" ON documents;
+DROP POLICY IF EXISTS "documents_select" ON documents;
+DROP POLICY IF EXISTS "documents_update" ON documents;
+DROP POLICY IF EXISTS "documents_delete" ON documents;
 
--- 5. Fix Messages Policy
-DROP POLICY IF EXISTS "Users can view messages in their conversations" ON messages;
+DROP POLICY IF EXISTS "students_all_clean" ON students;
+DROP POLICY IF EXISTS "students_select_secure" ON students;
+DROP POLICY IF EXISTS "students_all_secure" ON students;
+DROP POLICY IF EXISTS "students_update_policy" ON students;
 
-CREATE POLICY "Users can view messages in their conversations"
-ON messages FOR SELECT
-TO authenticated
-USING (
-    conversation_id IN ( SELECT conversation_id FROM get_my_conversation_ids() )
-);
+-- 3. APPLY NEW CLEAN POLICIES
 
--- 6. Also optimize "Participants can send messages" to use the function
-DROP POLICY IF EXISTS "Participants can send messages" ON messages;
+-- PROFILES
+CREATE POLICY "profiles_select_clean" ON profiles FOR SELECT TO authenticated
+USING (id = auth.uid() OR agency_id = get_my_agency_id());
 
-CREATE POLICY "Participants can send messages"
-ON messages FOR INSERT
-TO authenticated
-WITH CHECK (
-    sender_id = auth.uid()
-    AND conversation_id IN ( SELECT conversation_id FROM get_my_conversation_ids() )
-);
+-- ESSAYS
+CREATE POLICY "essays_select_clean" ON essays FOR SELECT TO authenticated
+USING (student_id = auth.uid() OR agency_id = get_my_agency_id());
+
+CREATE POLICY "essays_update_clean" ON essays FOR UPDATE TO authenticated
+USING (student_id = auth.uid() OR agency_id = get_my_agency_id());
+
+-- DOCUMENTS
+CREATE POLICY "documents_select_clean" ON documents FOR SELECT TO authenticated
+USING (student_id = auth.uid() OR agency_id = get_my_agency_id() OR is_teacher());
+
+CREATE POLICY "documents_update_clean" ON documents FOR UPDATE TO authenticated
+USING (student_id = auth.uid() OR agency_id = get_my_agency_id() OR is_teacher());
+
+-- STUDENTS
+CREATE POLICY "students_all_clean" ON students FOR ALL TO authenticated
+USING (agency_id = get_my_agency_id());

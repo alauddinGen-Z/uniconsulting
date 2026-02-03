@@ -44,17 +44,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Sync user profile to Zustand store
     const syncUserToStore = useCallback(async (authUser: User | null) => {
+        console.log("AuthProvider: syncUserToStore triggered for user:", authUser?.id);
         if (!authUser) {
             setAppUser(null);
             return;
         }
 
         try {
+            console.log("AuthProvider: Fetching profile from 'profiles' table...");
             const { data: profile, error } = await supabase
                 .from("profiles")
                 .select("full_name, role, agency_id")
                 .eq("id", authUser.id)
                 .maybeSingle();
+
+            console.log("AuthProvider: Profile fetch result - error:", error?.message);
 
             if (error) {
                 console.error("Error fetching profile:", error?.message || error?.code || error);
@@ -62,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (profile) {
+                console.log("AuthProvider: Profile found - syncing to Zustand store", profile.role);
                 const appUser: AppUser = {
                     id: authUser.id,
                     agencyId: profile.agency_id || "",
@@ -71,6 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     role: profile.role as any,
                 };
                 setAppUser(appUser);
+            } else {
+                console.log("AuthProvider: No profile found in DB for user");
             }
         } catch (error) {
             console.error("Error syncing user to store:", error);
@@ -80,14 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initialize auth state
     useEffect(() => {
         const initAuth = async () => {
+            console.log("AuthProvider: initAuth starting...");
             try {
                 const { data: { session: initialSession } } = await supabase.auth.getSession();
+                console.log("AuthProvider: getSession result - hasSession:", !!initialSession);
                 setSession(initialSession);
                 setUser(initialSession?.user || null);
                 await syncUserToStore(initialSession?.user || null);
             } catch (error) {
                 console.error("Error initializing auth:", error);
             } finally {
+                console.log("AuthProvider: initAuth finished - setting isLoading to false");
                 setIsLoading(false);
             }
         };
@@ -97,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, newSession) => {
+                console.log("AuthProvider: onAuthStateChange Event:", event);
                 setSession(newSession);
                 setUser(newSession?.user || null);
                 await syncUserToStore(newSession?.user || null);

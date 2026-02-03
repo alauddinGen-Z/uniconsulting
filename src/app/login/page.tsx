@@ -65,9 +65,11 @@ export default function LoginPage() {
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        console.log("Starting Auth Flow - isSignUp:", isSignUp);
 
         try {
             if (isSignUp) {
+                console.log("Starting Sign Up Process...");
                 if (!selectedTeacher) {
                     throw new Error("Please select a teacher to request access.");
                 }
@@ -75,6 +77,7 @@ export default function LoginPage() {
                     throw new Error("Please enter your full name.");
                 }
 
+                console.log("Calling auth.signUp for email:", email);
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
@@ -87,16 +90,20 @@ export default function LoginPage() {
                         },
                     },
                 });
+                console.log("auth.signUp result - error:", error?.message);
                 if (error) throw error;
 
                 // Check if the user was auto-confirmed (email confirmation disabled)
                 if (data.session) {
+                    console.log("User auto-confirmed, fetching profile...");
                     // User is logged in, fetch profile and redirect
                     const { data: profile } = await supabase
                         .from('profiles')
                         .select('role')
                         .eq('id', data.user!.id)
                         .single();
+
+                    console.log("Profile fetch result for new user:", profile);
 
                     const userRole = profile?.role || 'student';
                     toast.success(`Welcome, ${userRole}!`);
@@ -113,22 +120,29 @@ export default function LoginPage() {
                     return; // Exit early since we're navigating
                 } else {
                     // Email confirmation required
+                    console.log("Email confirmation required");
                     toast.success("Account created! Please check your email to verify.");
                     setIsSignUp(false);
                 }
             } else {
+                console.log("Starting Sign In Process for email:", email);
+                console.log("Calling auth.signInWithPassword...");
                 const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
+                console.log("auth.signInWithPassword result - success:", !!data.user, "error:", error?.message);
                 if (error) throw error;
 
 
+                console.log("Fetching profile for user ID:", data.user.id);
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('role, approval_status')
                     .eq('id', data.user.id)
                     .maybeSingle(); // Use maybeSingle to avoid 406 errors
+
+                console.log("Profile fetch result - profile:", profile, "error:", profileError?.message);
 
                 if (profileError) {
                     console.error("Profile fetch error:", profileError?.message || profileError?.code || profileError);
@@ -162,10 +176,9 @@ export default function LoginPage() {
 
                 toast.success(`Welcome back, ${userRole}!`);
 
-
-
                 // Reset loading state before navigation
                 setIsLoading(false);
+                console.log("Redirection starting to:", userRole);
 
                 // Use replace to prevent back-button returning to login
                 if (userRole === 'owner') {
@@ -178,8 +191,10 @@ export default function LoginPage() {
                 return; // Exit early since we're navigating
             }
         } catch (error: any) {
+            console.error("Auth Exception caught:", error);
             toast.error(error.message || "Authentication failed");
         } finally {
+            console.log("Auth process finally block - setting loading to false");
             setIsLoading(false);
         }
     };
