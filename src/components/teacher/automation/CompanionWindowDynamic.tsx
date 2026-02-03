@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, User, FileText, GraduationCap, Loader2, Download, File, Users, MapPin, Languages, Calculator, Award, Globe, Calendar, Mail, Phone, CreditCard, Heart, AlertCircle, Briefcase } from "lucide-react";
+import { Copy, Check, User, FileText, GraduationCap, Loader2, Download, File, Users, MapPin, Languages, Calculator, Award, Globe, Calendar, Mail, Phone, CreditCard, Heart, AlertCircle, Briefcase, ExternalLink } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
@@ -160,6 +160,22 @@ export default function CompanionWindowDynamic({ studentId }: Props) {
                             {profile.preferred_university || profile.preferred_country || 'No preference set'}
                         </p>
                     </div>
+                    <button
+                        onClick={() => {
+                            const profileUrl = `/teacher/students?studentId=${studentId}`;
+                            // Try to open in parent/opener window, fallback to new tab
+                            if (window.opener) {
+                                window.opener.location.href = profileUrl;
+                                window.opener.focus();
+                            } else {
+                                window.open(profileUrl, '_blank');
+                            }
+                        }}
+                        className="p-2 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-colors"
+                        title="View Full Profile"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                    </button>
                     <button
                         onClick={handleCopyAll}
                         className="p-2 bg-orange-100 text-orange-600 rounded-xl hover:bg-orange-200 transition-colors"
