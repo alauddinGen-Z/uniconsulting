@@ -149,7 +149,7 @@ export default function CompanionWindow() {
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        <div className="h-screen max-h-screen overflow-y-auto bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
             {/* Header */}
             <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 p-5">
                 <div className="flex items-center gap-4">
