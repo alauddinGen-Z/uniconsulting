@@ -146,9 +146,9 @@ export default function CompanionWindowDynamic({ studentId }: Props) {
     const maxGrade = profile.school_system === '11' ? 11 : 12;
 
     return (
-        <div className="h-screen max-h-screen overflow-y-auto bg-gradient-to-br from-orange-50 via-white to-pink-50">
-            {/* Compact Header */}
-            <div className="bg-white border-b border-slate-100 p-4">
+        <div className="h-screen flex flex-col bg-gradient-to-br from-orange-50 via-white to-pink-50">
+            {/* Sticky Header */}
+            <div className="flex-shrink-0 bg-white border-b border-slate-100 p-4">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-orange-500/20">
                         {profile.full_name?.charAt(0) || '?'}
@@ -170,8 +170,8 @@ export default function CompanionWindowDynamic({ studentId }: Props) {
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex bg-white border-b border-slate-100 overflow-x-auto">
+            {/* Sticky Tabs */}
+            <div className="flex-shrink-0 flex bg-white border-b border-slate-100 overflow-x-auto">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
@@ -194,8 +194,8 @@ export default function CompanionWindowDynamic({ studentId }: Props) {
                 ))}
             </div>
 
-            {/* Content */}
-            <div className="p-4 pb-20">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 pb-20">
                 {/* Personal Info Tab */}
                 {activeTab === 'info' && (
                     <div className="space-y-2">
