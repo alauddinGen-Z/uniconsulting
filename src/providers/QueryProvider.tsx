@@ -18,15 +18,15 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
             queries: {
-                // Data stays fresh for 2 minutes - then background refresh
-                staleTime: 2 * 60 * 1000,
+                // Data stays fresh for 5 minutes - reduces API calls
+                staleTime: 5 * 60 * 1000,
                 // Keep cached data for 30 minutes
                 gcTime: 30 * 60 * 1000,
-                // Silently refresh when window gains focus
-                refetchOnWindowFocus: true,
+                // Disable auto-refetch on window focus (reduces API calls)
+                refetchOnWindowFocus: false,
                 // Refetch on mount if stale
                 refetchOnMount: true,
-                // Don't retry on error
+                // Single retry on error
                 retry: 1,
                 // Enable structural sharing for faster updates
                 structuralSharing: true,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GraduationCap, Building, PenTool, Sparkles } from "lucide-react";
+import { GraduationCap, Building, PenTool } from "lucide-react";
 import UniversityList from "./UniversityList";
 import AcademicTab from "./tabs/AcademicTab";
 import EssaysTab from "./tabs/EssaysTab";
@@ -16,7 +16,7 @@ export default function ApplicationPage({ isLocked }: ApplicationPageProps) {
     const sections = [
         { id: "universities", label: "Universities", icon: Building },
         { id: "academic", label: "Academic", icon: GraduationCap },
-        { id: "essays", label: "Essays", icon: PenTool, hasAI: true },
+        { id: "essays", label: "Essays", icon: PenTool },
     ];
 
     return (
@@ -46,13 +46,6 @@ export default function ApplicationPage({ isLocked }: ApplicationPageProps) {
                         >
                             <section.icon className="w-4 h-4" />
                             {section.label}
-                            {'hasAI' in section && section.hasAI && (
-                                <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${activeSection === section.id ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-600'
-                                    }`}>
-                                    <Sparkles className="w-3 h-3" />
-                                    AI
-                                </span>
-                            )}
                         </button>
                     ))}
                 </div>

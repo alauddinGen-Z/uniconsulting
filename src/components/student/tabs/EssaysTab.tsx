@@ -222,13 +222,10 @@ export default function EssaysTab({ isLocked }: EssaysTabProps) {
 
         setIsReviewing(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-
-            const response = await fetch('https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/ai-review', {
+            const response = await fetch('/api/ai-review', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token || ''}`,
                 },
                 body: JSON.stringify({
                     content: essay,
@@ -324,20 +321,6 @@ export default function EssaysTab({ isLocked }: EssaysTabProps) {
                         >
                             <History className="w-4 h-4" />
                             Time Travel
-                        </button>
-
-                        {/* AI Review Button */}
-                        <button
-                            onClick={handleAIReview}
-                            disabled={isReviewing || wordCount < 50}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isReviewing ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Sparkles className="w-4 h-4" />
-                            )}
-                            {isReviewing ? "Analyzing..." : "Get AI Feedback"}
                         </button>
                     </div>
                 </div>

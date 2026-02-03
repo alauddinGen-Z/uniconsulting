@@ -48,6 +48,7 @@ export default function RootLayout({
     <html lang="en" className={themeClass}>
       <body
         className={`${montserrat.variable} ${inter.variable} antialiased`}
+        suppressHydrationWarning
       >
         <LanguageProvider>
           <QueryProvider>

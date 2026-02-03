@@ -17,7 +17,8 @@ import { StudentDataProvider } from "@/contexts/StudentDataContext";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { Menu } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { usePrefetch } from "@/hooks/usePrefetch";
 
 export default function StudentLayout({
     children,
@@ -28,10 +29,27 @@ export default function StudentLayout({
     const [isLoading, setIsLoading] = useState(true);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
     const supabase = createClient();
+    const { prefetchStudentProfile, prefetchStudentDocuments, prefetchStudentEssays } = usePrefetch();
 
     // Extract active tab from pathname
     const activeTab = pathname.split("/").pop() || "home";
+
+    // Prefetch all routes and data on layout mount
+    useEffect(() => {
+        // Prefetch route JS bundles
+        router.prefetch('/student/home');
+        router.prefetch('/student/documents');
+        router.prefetch('/student/profile');
+        router.prefetch('/student/messages');
+        router.prefetch('/student/application');
+
+        // Prefetch critical data
+        prefetchStudentProfile();
+        prefetchStudentDocuments();
+        prefetchStudentEssays();
+    }, [router, prefetchStudentProfile, prefetchStudentDocuments, prefetchStudentEssays]);
 
     const checkApprovalStatus = useCallback(async () => {
         try {

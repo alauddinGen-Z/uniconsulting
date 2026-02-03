@@ -33,10 +33,19 @@ export default function TeacherLayout({
 
     // Aggressive prefetching on layout mount
     useEffect(() => {
-        // Prefetch critical data when the teacher layout mounts
+        // Prefetch route JS bundles for instant navigation
+        router.prefetch('/teacher/home');
+        router.prefetch('/teacher/students');
+        router.prefetch('/teacher/kanban');
+        router.prefetch('/teacher/messages');
+        router.prefetch('/teacher/pending');
+        router.prefetch('/teacher/automation');
+        router.prefetch('/teacher/ai-matcher');
+
+        // Prefetch critical data
         prefetchTeacherStudents();
         prefetchPendingStudents();
-    }, [prefetchTeacherStudents, prefetchPendingStudents]);
+    }, [router, prefetchTeacherStudents, prefetchPendingStudents]);
 
     return (
         <TeacherDataProvider>

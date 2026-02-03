@@ -11,7 +11,8 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface Stats {
+// Export interfaces for usage in page.tsx
+export interface Stats {
     totalStudents: number;
     pendingApprovals: number;
     approvedStudents: number;
@@ -20,7 +21,7 @@ interface Stats {
     upcomingDeadlines: number;
 }
 
-interface Activity {
+export interface Activity {
     id: string;
     type: 'document' | 'application' | 'message' | 'approval' | 'essay';
     title: string;
@@ -29,13 +30,19 @@ interface Activity {
     studentName?: string;
 }
 
-interface Deadline {
+export interface Deadline {
     id: string;
     universityName: string;
     studentName: string;
     date: string;
     daysLeft: number;
     type: string;
+}
+
+export interface DashboardData {
+    stats: Stats;
+    activities: Activity[];
+    deadlines: Deadline[];
 }
 
 // Helper function - outside component for use in useQuery
@@ -51,13 +58,14 @@ const formatTimeAgo = (date: Date): string => {
     return date.toLocaleDateString();
 };
 
-export default function TeacherHomeDashboard() {
+export default function TeacherHomeDashboard({ initialData }: { initialData?: DashboardData | null }) {
     const supabase = createClient();
     const { user: authUser, isLoading: authLoading } = useAuth();
 
     // React Query for dashboard data - instant on tab switch!
     const { data: dashboardData, isLoading } = useQuery({
         queryKey: ['teacher', 'dashboard', authUser?.id],
+        initialData: initialData || undefined,
         queryFn: async () => {
             // Use the authUser from context instead of fetching again
             if (!authUser) throw new Error("Not authenticated");

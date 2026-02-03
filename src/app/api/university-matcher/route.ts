@@ -143,24 +143,49 @@ Return ONLY valid JSON in this exact format:
             );
         }
 
-        // Create cache key from student profile data
-        const cacheInput = `matcher:${studentId}:${profile.gpa || ''}:${profile.sat_total || ''}:${profile.ielts_overall || ''}:${profile.preferred_major || ''}`;
+        // Create cache key from student profile data (v4 = increased token limit)
+        const cacheInput = `matcher_v4:${studentId}:${profile.gpa || ''}:${profile.sat_total || ''}:${profile.ielts_overall || ''}:${profile.preferred_major || ''}`;
 
         // Call Gemini API with caching and retry logic
         let content: string;
         let fromCache = false;
         try {
+            console.log('[University Matcher] Starting AI request for student:', studentId);
             const result = await getOrFetchAIResponseServer<string>(
                 cacheInput,
                 'university_match',
                 async () => {
+                    console.log('[University Matcher] Calling Gemini API with JSON schema...');
                     return await callGeminiWithRetry(
                         geminiKey,
                         {
                             contents: [{ parts: [{ text: prompt }] }],
                             generationConfig: {
                                 temperature: 0.7,
-                                maxOutputTokens: 2048
+                                maxOutputTokens: 8192,
+                                responseMimeType: 'application/json',
+                                responseSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        matches: {
+                                            type: 'array',
+                                            items: {
+                                                type: 'object',
+                                                properties: {
+                                                    name: { type: 'string' },
+                                                    country: { type: 'string' },
+                                                    matchScore: { type: 'number' },
+                                                    reasons: { type: 'array', items: { type: 'string' } },
+                                                    requirements: { type: 'string' },
+                                                    tuitionRange: { type: 'string' }
+                                                },
+                                                required: ['name', 'country', 'matchScore', 'reasons']
+                                            }
+                                        },
+                                        summary: { type: 'string' }
+                                    },
+                                    required: ['matches', 'summary']
+                                }
                             }
                         },
                         {
@@ -185,29 +210,75 @@ Return ONLY valid JSON in this exact format:
             );
         }
 
-        // Parse the response
+        // Parse the response - handle markdown code blocks from Gemini
         try {
-            const parsed = JSON.parse(content);
+            console.log('[University Matcher] ==================== DEBUG START ====================');
+            console.log('[University Matcher] Raw content type:', typeof content);
+            console.log('[University Matcher] Raw content length:', content?.length);
+            console.log('[University Matcher] Raw content first 1000 chars:', content?.substring(0, 1000));
+            console.log('[University Matcher] ==================== DEBUG END ====================');
+
+            // First, clean up the content - remove markdown code blocks if present
+            let cleanContent = content || '';
+
+            // Remove ```json ... ``` or ``` ... ``` wrapper
+            const codeBlockMatch = cleanContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeBlockMatch) {
+                console.log('[University Matcher] Found code block wrapper, extracting content');
+                cleanContent = codeBlockMatch[1].trim();
+            }
+
+            // Remove any leading/trailing whitespace and newlines
+            cleanContent = cleanContent.trim();
+
+            console.log('[University Matcher] Clean content starts with:', cleanContent.substring(0, 100));
+
+            // Try to parse the cleaned content
+            const parsed = JSON.parse(cleanContent);
+            console.log('[University Matcher] Successfully parsed AI response');
             return NextResponse.json({
                 success: true,
                 matches: parsed.matches || [],
                 summary: parsed.summary || "",
                 fromCache
             });
-        } catch {
-            // Try to extract JSON from response
-            const jsonMatch = content?.match(/\{[\s\S]*\}/);
+        } catch (parseError: any) {
+            console.error('[University Matcher] ==================== PARSE ERROR ====================');
+            console.error('[University Matcher] Parse error message:', parseError?.message);
+            console.error('[University Matcher] Content type:', typeof content);
+            console.error('[University Matcher] Content is null/undefined:', content == null);
+            console.error('[University Matcher] Content first 500 chars:', content?.substring(0, 500));
+            console.error('[University Matcher] ==================== PARSE ERROR END ====================');
+
+            // Fallback: Try to extract JSON object from response
+            const jsonMatch = content?.match(/\{[\s\S]*"matches"[\s\S]*\}/);
             if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                return NextResponse.json({
-                    success: true,
-                    matches: parsed.matches || [],
-                    summary: parsed.summary || "",
-                    fromCache
-                });
+                try {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    console.log('[University Matcher] Extracted JSON via regex fallback');
+                    return NextResponse.json({
+                        success: true,
+                        matches: parsed.matches || [],
+                        summary: parsed.summary || "",
+                        fromCache
+                    });
+                } catch {
+                    // Fallback failed too
+                    console.error('[University Matcher] Regex fallback also failed');
+                }
             }
+
             return NextResponse.json(
-                { success: false, error: 'Failed to parse AI response' },
+                {
+                    success: false,
+                    error: 'Failed to parse AI response. Please try again.',
+                    debug: {
+                        contentType: typeof content,
+                        contentLength: content?.length || 0,
+                        contentPreview: content?.substring(0, 300) || 'NO CONTENT',
+                        parseError: parseError?.message || 'Unknown error'
+                    }
+                },
                 { status: 500 }
             );
         }

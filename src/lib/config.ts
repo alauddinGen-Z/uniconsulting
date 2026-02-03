@@ -30,9 +30,9 @@ export const FEATURES = {
 
 export const API_ENDPOINTS = {
     APPROVE_STUDENT: '/api/approve-student',
-    AI_REVIEW: 'https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/ai-review',
-    DOCUMENT_OCR: 'https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/document-ocr',
-    UNIVERSITY_MATCHER: 'https://ylwyuogdfwugjexyhtrq.supabase.co/functions/v1/university-matcher',
+    AI_REVIEW: '/api/ai-review',
+    DOCUMENT_OCR: '/api/document-ocr',
+    UNIVERSITY_MATCHER: '/api/university-matcher',
 } as const;
 
 // ============================================

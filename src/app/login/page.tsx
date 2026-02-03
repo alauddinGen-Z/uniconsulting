@@ -131,7 +131,7 @@ export default function LoginPage() {
                     .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
                 if (profileError) {
-                    console.error("Profile fetch error:", profileError);
+                    console.error("Profile fetch error:", profileError?.message || profileError?.code || profileError);
                     toast.error("Error fetching profile. Please try again.");
                     await supabase.auth.signOut();
                     throw profileError;

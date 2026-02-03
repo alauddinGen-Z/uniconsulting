@@ -153,6 +153,7 @@ export interface GeminiRequest {
         temperature?: number;
         maxOutputTokens?: number;
         responseMimeType?: string;
+        responseSchema?: Record<string, unknown>; // JSON Schema for structured output
     };
 }
 
@@ -205,7 +206,7 @@ export async function callGeminiWithRetry(
         ...config,
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     let lastError: Error | null = null;
 
@@ -250,6 +251,12 @@ export async function callGeminiWithRetry(
             // Parse successful response
             const result: GeminiResponse = await response.json();
 
+            // DEBUG: Log full response structure
+            console.log('[Gemini] Response candidates count:', result.candidates?.length);
+            console.log('[Gemini] First candidate finishReason:', (result as any).candidates?.[0]?.finishReason);
+            console.log('[Gemini] First candidate parts count:', result.candidates?.[0]?.content?.parts?.length);
+            console.log('[Gemini] Full candidates structure:', JSON.stringify(result.candidates, null, 2).substring(0, 1500));
+
             // Check for API-level errors
             if (result.error) {
                 throw new GeminiAPIError(
@@ -259,8 +266,11 @@ export async function callGeminiWithRetry(
                 );
             }
 
-            // Extract text from response
-            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            // Extract text from response - concatenate ALL parts (Gemini may split long responses)
+            const parts = result.candidates?.[0]?.content?.parts || [];
+            const text = parts
+                .map(part => part.text || '')
+                .join('');
 
             if (!text) {
                 throw new GeminiAPIError(
@@ -270,7 +280,7 @@ export async function callGeminiWithRetry(
                 );
             }
 
-            console.log(`[Gemini] Request successful (attempt ${attempt + 1})`);
+            console.log(`[Gemini] Request successful (attempt ${attempt + 1}), response length: ${text.length}`);
             return text;
 
         } catch (error: any) {

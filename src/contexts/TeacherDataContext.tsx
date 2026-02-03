@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback,
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
-interface Student {
+export interface Student {
     id: string;
     full_name: string;
     email: string;

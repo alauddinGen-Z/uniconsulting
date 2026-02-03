@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .maybeSingle();
 
             if (error) {
-                console.error("Error fetching profile:", error);
+                console.error("Error fetching profile:", error?.message || error?.code || error);
                 return;
             }
 

@@ -10,9 +10,17 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
-import KanbanBoard, { type KanbanStudent, type ApplicationStatus } from "@/components/teacher/KanbanBoard";
+import { type KanbanStudent, type ApplicationStatus } from "@/components/teacher/KanbanBoard";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import dynamic from "next/dynamic";
+import { KanbanSkeleton } from "@/components/shared/Skeletons";
+
+// Dynamic import for heavy Kanban component
+const KanbanBoard = dynamic(() => import("@/components/teacher/KanbanBoard"), {
+    loading: () => <KanbanSkeleton />,
+    ssr: false // Drag and drop is client-side only anyway
+});
 
 export default function TeacherKanbanPage() {
     const [students, setStudents] = useState<KanbanStudent[]>([]);

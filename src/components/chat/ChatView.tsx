@@ -360,7 +360,11 @@ export default function ChatView({ userRole }: Props) {
                 .select()
                 .single();
 
-            if (convError) throw convError;
+            if (convError) {
+                console.error('Failed to create conversation:', convError);
+                toast.error(`Failed to create chat: ${convError.message}`);
+                throw convError;
+            }
 
             // Add participants
             await supabase
@@ -633,8 +637,8 @@ export default function ChatView({ userRole }: Props) {
                                             }
                                         }}
                                         className={`p-3 rounded-xl transition-colors ${isListening
-                                                ? 'bg-red-500 text-white animate-pulse'
-                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                            ? 'bg-red-500 text-white animate-pulse'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                             }`}
                                         title={isListening ? 'Stop listening' : 'Voice input'}
                                     >

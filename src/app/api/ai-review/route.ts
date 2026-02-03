@@ -114,14 +114,28 @@ export async function POST(request: NextRequest) {
     let feedback;
     try {
       let jsonText = text;
-      if (text.includes("```json")) {
-        jsonText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+
+      // Try to extract JSON from markdown code blocks
+      const jsonBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonBlockMatch) {
+        jsonText = jsonBlockMatch[1];
       } else if (text.includes("```")) {
-        jsonText = text.replace(/```\n?/g, "");
+        // Fallback: remove all backticks
+        jsonText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
       }
+
+      // Also try to find raw JSON object
+      if (!jsonText.trim().startsWith("{")) {
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
+      }
+
       feedback = JSON.parse(jsonText.trim());
+      console.log("[AI Review] JSON parsed successfully");
     } catch (parseError) {
-      console.log("[AI Review] JSON parse failed, using raw feedback");
+      console.log("[AI Review] JSON parse failed, using raw feedback:", parseError);
       feedback = {
         overallScore: 7,
         overallComment: "Review completed. See detailed feedback below.",

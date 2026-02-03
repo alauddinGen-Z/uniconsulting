@@ -8,18 +8,23 @@ import {
     Filter, LayoutGrid, List, ChevronRight
 } from "lucide-react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { useTeacherData } from "@/contexts/TeacherDataContext";
+import { useTeacherData, type Student } from "@/contexts/TeacherDataContext";
 
 interface StudentListViewProps {
     onSelectStudent: (studentId: string) => void;
+    initialStudents?: Student[];
 }
 
 type SortField = 'name' | 'country' | 'date' | 'score';
 type SortDirection = 'asc' | 'desc';
 type FilterCountry = 'all' | string;
 
-export default function StudentListView({ onSelectStudent }: StudentListViewProps) {
-    const { students, isLoading } = useTeacherData();
+export default function StudentListView({ onSelectStudent, initialStudents }: StudentListViewProps) {
+    const { students: contextStudents, isLoading: contextLoading } = useTeacherData();
+
+    // Prefer server-passed data if available
+    const students = initialStudents || contextStudents;
+    const isLoading = initialStudents ? false : contextLoading;
 
     // Only show approved students in this view
     const approvedStudents = useMemo(() =>
