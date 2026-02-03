@@ -146,7 +146,7 @@ export default function CompanionWindowDynamic({ studentId }: Props) {
     const maxGrade = profile.school_system === '11' ? 11 : 12;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-pink-50">
+        <div className="h-screen max-h-screen overflow-y-auto bg-gradient-to-br from-orange-50 via-white to-pink-50">
             {/* Compact Header */}
             <div className="bg-white border-b border-slate-100 p-4">
                 <div className="flex items-center gap-3">
