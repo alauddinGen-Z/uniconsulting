@@ -2,10 +2,7 @@
 
 import { MessageCircle, Search, Plus, Users, MoreVertical, Trash2, X } from "lucide-react";
 import { Conversation } from "./types";
-import { formatTime } from "@/utils/date"; // We might need to extract formatTime or duplicate it. 
-// I'll assume we can pass it or duplicate it for now to avoid creating utils/date if it doesn't exist.
-// Actually allow me to inline formatTime here or extract it to a util.
-// I'll inline it for safety.
+
 
 interface ChatSidebarProps {
     userRole: 'teacher' | 'student';
