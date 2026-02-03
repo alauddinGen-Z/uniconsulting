@@ -4,14 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import {
     Search, Globe, User, Users, UserCheck, Clock,
     ArrowUpDown, SortAsc, SortDesc, FileText, GraduationCap,
-    Mail, Calendar, Eye, MessageCircle, Target, BookOpen,
-    Filter, LayoutGrid, List, ChevronRight
+    Mail, Calendar, MessageCircle, Target, BookOpen,
+    Filter, LayoutGrid, List
 } from "lucide-react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useTeacherData, type Student } from "@/contexts/TeacherDataContext";
 
 interface StudentListViewProps {
-    onSelectStudent: (studentId: string) => void;
     initialStudents?: Student[];
 }
 
@@ -19,7 +18,7 @@ type SortField = 'name' | 'country' | 'date' | 'score';
 type SortDirection = 'asc' | 'desc';
 type FilterCountry = 'all' | string;
 
-export default function StudentListView({ onSelectStudent, initialStudents }: StudentListViewProps) {
+export default function StudentListView({ initialStudents }: StudentListViewProps) {
     const { students: contextStudents, isLoading: contextLoading } = useTeacherData();
 
     // Prefer server-passed data if available
@@ -291,9 +290,7 @@ export default function StudentListView({ onSelectStudent, initialStudents }: St
                                 <th className="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
                                     <SortButton field="date" label="Joined" />
                                 </th>
-                                <th className="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                    Action
-                                </th>
+
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -302,8 +299,7 @@ export default function StudentListView({ onSelectStudent, initialStudents }: St
                                 return (
                                     <tr
                                         key={student.id}
-                                        onClick={() => onSelectStudent(student.id)}
-                                        className="hover:bg-orange-50/50 cursor-pointer transition-colors group"
+                                        className="hover:bg-orange-50/50 transition-colors group"
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -355,16 +351,7 @@ export default function StudentListView({ onSelectStudent, initialStudents }: St
                                             </div>
                                         </td>
 
-                                        <td className="px-6 py-4">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onSelectStudent(student.id); }}
-                                                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs font-bold rounded-xl hover:shadow-lg hover:shadow-orange-500/20 transition-all"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                                View
-                                                <ChevronRight className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
+
                                     </tr>
                                 );
                             })}
@@ -378,8 +365,7 @@ export default function StudentListView({ onSelectStudent, initialStudents }: St
                             return (
                                 <div
                                     key={student.id}
-                                    onClick={() => onSelectStudent(student.id)}
-                                    className="bg-white rounded-2xl border border-slate-100 p-5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-500/10 cursor-pointer transition-all group"
+                                    className="bg-white rounded-2xl border border-slate-100 p-5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-500/10 transition-all group"
                                 >
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-center gap-3">
@@ -422,13 +408,7 @@ export default function StudentListView({ onSelectStudent, initialStudents }: St
                                         </div>
                                     )}
 
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onSelectStudent(student.id); }}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:shadow-orange-500/20 transition-all"
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                        View Profile
-                                    </button>
+
                                 </div>
                             );
                         })}
