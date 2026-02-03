@@ -17,7 +17,6 @@ export interface Message {
     created_at: string;
     sender_name?: string;
     is_from_me?: boolean;
-    isOptimistic?: boolean;
 }
 
 export interface Student {

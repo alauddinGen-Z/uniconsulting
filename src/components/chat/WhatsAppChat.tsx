@@ -26,10 +26,6 @@ export default function WhatsAppChat({ userRole }: Props) {
     const [isSending, setIsSending] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [students, setStudents] = useState<Student[]>([]);
-    const [typingUsersMap, setTypingUsersMap] = useState<Record<string, string>>({});
-
-    const chatChannelRef = useRef<any>(null);
-    // const supabase = createClient(); // REMOVED duplication
 
     // Search State
     const [searchQuery, setSearchQuery] = useState("");
@@ -209,17 +205,7 @@ export default function WhatsAppChat({ userRole }: Props) {
 
     const subscribeToMessages = (conversationId: string) => {
         const channel = supabase
-            .channel(`uni-chat-${conversationId}`, {
-                config: {
-                    presence: {
-                        key: currentUserId || 'anon',
-                    },
-                },
-            });
-
-        chatChannelRef.current = channel;
-
-        channel
+            .channel(`uni-chat-${conversationId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -232,92 +218,29 @@ export default function WhatsAppChat({ userRole }: Props) {
                     .eq('id', payload.new.sender_id)
                     .single();
 
-                const newMsg: Message = {
+                const newMsg = {
                     ...payload.new,
                     sender_name: sender?.full_name || 'Unknown',
                     is_from_me: payload.new.sender_id === currentUserId
                 };
-
-                setMessages(prev => {
-                    // Check if this message already exists (e.g. from optimistic update)
-                    // We can match by a temporary ID if we used one, or by content/time proximity.
-                    // For now, let's just avoid duplication if the ID matches or if it's the latest optimistic one.
-                    const exists = prev.find(m => m.id === newMsg.id);
-                    if (exists) return prev;
-
-                    // Remove optimistic version if it exists
-                    return [...prev.filter(m => !m.isOptimistic), newMsg];
-                });
-
-                // Update conversation last message in list
-                setConversations(prev => prev.map(c =>
-                    c.id === conversationId
-                        ? { ...c, last_message: newMsg.content, last_message_time: newMsg.created_at }
-                        : c
-                ));
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = channel.presenceState();
-                const typing: Record<string, string> = {};
-
-                Object.values(state).forEach((presences: any) => {
-                    presences.forEach((p: any) => {
-                        if (p.isTyping && p.userId !== currentUserId) {
-                            typing[p.userId] = p.userName;
-                        }
-                    });
-                });
-                setTypingUsersMap(typing);
+                setMessages(prev => [...prev, newMsg]);
             })
             .subscribe();
 
-        return () => {
-            chatChannelRef.current = null;
-            supabase.removeChannel(channel);
-        };
-    };
-
-    const handleTyping = (isTyping: boolean) => {
-        if (!chatChannelRef.current || !currentUserId) return;
-
-        const profile = students.find(s => s.id === currentUserId);
-        const name = profile?.full_name || (userRole === 'teacher' ? 'Teacher' : 'Student');
-
-        chatChannelRef.current.track({
-            isTyping,
-            userId: currentUserId,
-            userName: name
-        });
+        return () => { supabase.removeChannel(channel); };
     };
 
     const sendMessage = async () => {
         if (!newMessage.trim() || !selectedConversation || !currentUserId) return;
 
-        const content = newMessage.trim();
-        const tempId = `temp-${Date.now()}`;
-
-        // Optimistic message
-        const optimisticMsg: Message = {
-            id: tempId,
-            conversation_id: selectedConversation.id,
-            sender_id: currentUserId,
-            content: content,
-            created_at: new Date().toISOString(),
-            sender_name: 'You',
-            is_from_me: true,
-            isOptimistic: true
-        };
-
-        setMessages(prev => [...prev, optimisticMsg]);
-        setNewMessage("");
-
+        setIsSending(true);
         try {
             const { error } = await supabase
                 .from('messages')
                 .insert({
                     conversation_id: selectedConversation.id,
                     sender_id: currentUserId,
-                    content: content,
+                    content: newMessage.trim(),
                     is_announcement: false
                 });
 
@@ -328,9 +251,13 @@ export default function WhatsAppChat({ userRole }: Props) {
                 .update({ updated_at: new Date().toISOString() })
                 .eq('id', selectedConversation.id);
 
+            setNewMessage("");
+            // Optimistic update could happen here for better UX
+            // But subscription handles it.
         } catch (error) {
             toast.error("Failed to send message");
-            setMessages(prev => prev.filter(m => m.id !== tempId));
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -539,7 +466,6 @@ export default function WhatsAppChat({ userRole }: Props) {
                             onCopyChat={handleCopyChat}
                             onClearMessages={handleClearMessages}
                             onLeaveGroup={handleLeaveGroup}
-                            typingUsers={Object.values(typingUsersMap)}
                         />
 
                         <MessageList
@@ -553,8 +479,7 @@ export default function WhatsAppChat({ userRole }: Props) {
                             value={newMessage}
                             onChange={setNewMessage}
                             onSend={sendMessage}
-                            isSending={false}
-                            onTyping={handleTyping}
+                            isSending={isSending}
                         />
                     </>
                 ) : (
