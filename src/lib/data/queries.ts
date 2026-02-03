@@ -11,6 +11,17 @@
 import { cache } from 'react';
 import { createClient } from '@/utils/supabase/server';
 
+// Timeout wrapper to prevent indefinite hangs on production
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((resolve) => setTimeout(() => {
+            console.warn(`Query timed out after ${ms}ms, returning fallback`);
+            resolve(fallback);
+        }, ms))
+    ]);
+}
+
 export type Profile = {
     id: string;
     full_name: string | null;
@@ -143,12 +154,19 @@ export const getStudentById = cache(async (studentId: string) => {
 export const getTeacherDashboardData = cache(async (teacherId: string) => {
     const supabase = await createClient();
 
-    // 1. Fetch all students for this teacher
-    const { data: students } = await supabase
+    // Student type for this query
+    type StudentPartial = { id: string; full_name: string | null; approval_status: string | null; created_at: string | null };
+
+    // 1. Fetch all students for this teacher (with 5s timeout)
+    const studentsPromise = supabase
         .from('profiles')
         .select('id, full_name, approval_status, created_at')
         .eq('teacher_id', teacherId)
-        .eq('role', 'student');
+        .eq('role', 'student')
+        .then(res => res) as Promise<{ data: StudentPartial[] | null; error: any }>;
+
+    const studentsResult = await withTimeout(studentsPromise, 5000, { data: [] as StudentPartial[], error: null });
+    const students = studentsResult.data || [];
 
     const totalStudents = students?.length || 0;
     const pendingApprovals = students?.filter(s => s.approval_status === 'pending').length || 0;
@@ -228,12 +246,14 @@ export const getTeacherDashboardData = cache(async (teacherId: string) => {
 
     // Recent students
     const recentStudents = students?.filter(s => {
+        if (!s.created_at) return false;
         const created = new Date(s.created_at);
         const daysDiff = (new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
         return daysDiff <= 7;
     }) || [];
 
     recentStudents.forEach(s => {
+        if (!s.created_at) return;
         activities.push({
             id: `student-${s.id}`,
             type: 'approval',
