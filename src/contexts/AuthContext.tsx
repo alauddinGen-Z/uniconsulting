@@ -52,35 +52,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         try {
             console.log("AuthProvider: Fetching profile from 'profiles' table...");
-            const { data: profile, error } = await supabase
+
+            // Add a timeout to the profile fetch to prevent infinite hanging
+            const fetchPromise = supabase
                 .from("profiles")
                 .select("full_name, role, agency_id")
                 .eq("id", authUser.id)
                 .maybeSingle();
 
-            console.log("AuthProvider: Profile fetch result - error:", error?.message);
+            const timeoutPromise = new Promise<any>((_, reject) =>
+                setTimeout(() => reject(new Error("Profile fetch timeout")), 3000)
+            );
 
-            if (error) {
-                console.error("Error fetching profile:", error?.message || error?.code || error);
-                return;
+            let profileData: { data: any | null; error: any | null } = { data: null, error: null };
+
+            try {
+                const result = await Promise.race([
+                    fetchPromise,
+                    timeoutPromise
+                ]);
+                profileData = result as { data: any | null; error: any | null };
+            } catch (err: any) {
+                profileData.error = err; // Catch timeout or other promise rejections
             }
 
-            if (profile) {
-                console.log("AuthProvider: Profile found - syncing to Zustand store", profile.role);
+            console.log("AuthProvider: Profile fetch result - error:", profileData.error?.message);
+
+            if (profileData.error) {
+                console.error("AuthProvider: Profile fetch error:", profileData.error.message);
+                // Fallback to basic user info if profile fetch fails or times out
                 const appUser: AppUser = {
                     id: authUser.id,
-                    agencyId: profile.agency_id || "",
-                    name: profile.full_name || authUser.email?.split("@")[0] || "User",
+                    agencyId: "", // Default empty
+                    name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
                     email: authUser.email || "",
                     avatarUrl: null,
-                    role: profile.role as any,
+                    role: authUser.user_metadata?.role || "student", // Default role
+                };
+                setAppUser(appUser);
+            } else if (profileData.data) {
+                console.log("AuthProvider: Profile found - syncing to Zustand store", profileData.data.role);
+                const appUser: AppUser = {
+                    id: authUser.id,
+                    agencyId: profileData.data.agency_id || "",
+                    name: profileData.data.full_name || authUser.email?.split("@")[0] || "User",
+                    email: authUser.email || "",
+                    avatarUrl: null,
+                    role: profileData.data.role as any,
                 };
                 setAppUser(appUser);
             } else {
-                console.log("AuthProvider: No profile found in DB for user");
+                console.warn("AuthProvider: No profile found in DB for user, using metadata fallback");
+                const appUser: AppUser = {
+                    id: authUser.id,
+                    agencyId: "", // Default empty
+                    name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+                    email: authUser.email || "",
+                    avatarUrl: null,
+                    role: authUser.user_metadata?.role || "student", // Default role
+                };
+                setAppUser(appUser);
             }
-        } catch (error) {
-            console.error("Error syncing user to store:", error);
+        } catch (err) {
+            console.error("AuthProvider: Error syncing user to store (outer catch):", err);
+            // Ensure a basic user is set even if the entire sync process fails unexpectedly
+            const appUser: AppUser = {
+                id: authUser.id,
+                agencyId: "",
+                name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+                email: authUser.email || "",
+                avatarUrl: null,
+                role: authUser.user_metadata?.role || "student",
+            };
+            setAppUser(appUser);
         }
     }, [supabase, setAppUser]);
 

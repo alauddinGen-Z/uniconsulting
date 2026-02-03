@@ -136,33 +136,47 @@ export default function LoginPage() {
 
 
                 console.log("Fetching profile for user ID:", data.user.id);
-                const { data: profile, error: profileError } = await supabase
+
+                // Add a timeout to the profile fetch
+                const fetchPromise = supabase
                     .from('profiles')
                     .select('role, approval_status')
                     .eq('id', data.user.id)
-                    .maybeSingle(); // Use maybeSingle to avoid 406 errors
+                    .maybeSingle();
+
+                const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+                    setTimeout(() => reject(new Error("Profile fetch timeout")), 3000)
+                );
+
+                let profileResult: { data: any; error: any };
+                try {
+                    const result = await Promise.race([fetchPromise, timeoutPromise]);
+                    profileResult = result as { data: any; error: any };
+                } catch (timeoutError) {
+                    console.warn("Profile fetch timed out, falling back to metadata...");
+                    profileResult = {
+                        data: {
+                            role: data.user.user_metadata?.role || 'student',
+                            approval_status: data.user.user_metadata?.approval_status || 'pending'
+                        },
+                        error: null
+                    };
+                }
+
+                const profile = profileResult.data;
+                const profileError = profileResult.error;
 
                 console.log("Profile fetch result - profile:", profile, "error:", profileError?.message);
 
                 if (profileError) {
-                    console.error("Profile fetch error:", profileError?.message || profileError?.code || profileError);
-                    toast.error("Error fetching profile. Please try again.");
-                    await supabase.auth.signOut();
-                    throw profileError;
+                    console.error("Profile fetch error, using fallback:", profileError.message);
                 }
 
-                if (!profile) {
-                    // Profile doesn't exist yet - this shouldn't happen, but handle gracefully
-                    console.error("Profile not found for user:", data.user.id);
-                    toast.error("Profile not found. Please contact support.");
-                    await supabase.auth.signOut();
-                    throw new Error("Profile not found");
-                }
+                // Fallback to metadata if profile doesn't exist or fetch failed
+                const userRole = profile?.role || data.user.user_metadata?.role || 'student';
+                const status = profile?.approval_status || data.user.user_metadata?.approval_status || 'pending';
 
-                console.log("Fetched Profile:", profile);
-                const userRole = profile.role;
-                console.log("User Role from DB:", userRole);
-                const status = profile.approval_status || 'pending';
+                console.log("Final determined role:", userRole, "status:", status);
 
                 if (!userRole) {
                     toast.error("Account role not set. Please contact support.");
