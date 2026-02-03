@@ -102,8 +102,7 @@ export default function TeacherSidebar({ activeTab, onTabChange, isMobileOpen = 
                 <div className="p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
                     <div className="relative z-10 flex items-center gap-3 mb-1">
-                        <Image src="/logo.png" alt="UNI" width={40} height={40} className="rounded-xl shadow-brand" />
-                        <span className="font-black font-montserrat text-2xl tracking-tight text-white">{ACTIVE_THEME.branding.logoText}</span>
+                        <Image src="/logo.png" alt="UNI" width={48} height={48} className="rounded-xl shadow-brand" />
                     </div>
                     <p className="text-slate-400 text-xs font-medium ml-1 relative z-10">Teacher Console</p>
                 </div>

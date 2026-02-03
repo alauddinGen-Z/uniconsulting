@@ -228,7 +228,7 @@ export default function LoginPage() {
 
             <div className="glass-panel w-full max-w-md p-8 space-y-8 bg-white shadow-2xl rounded-3xl border border-white/50">
                 <div className="flex flex-col items-center justify-center space-y-4 mb-2">
-                    <Image src="/logo-full.png" alt="UNI CONSULTING" width={200} height={50} className="h-12 w-auto" priority />
+                    <Image src="/logo.png" alt="UNI" width={120} height={120} className="rounded-3xl shadow-xl shadow-orange-500/20" priority />
                 </div>
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-black font-montserrat text-slate-900">

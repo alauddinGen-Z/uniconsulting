@@ -68,8 +68,7 @@ export default function TeacherLayout({
                         <Menu className="w-6 h-6 text-slate-700" />
                     </button>
                     <div className="flex items-center gap-2 ml-3">
-                        <Image src="/logo.png" alt="UNI" width={32} height={32} className="rounded-lg" />
-                        <span className="font-bold text-slate-900">UNI</span>
+                        <Image src="/logo.png" alt="UNI" width={38} height={38} className="rounded-lg shadow-brand" />
                     </div>
                 </div>
 

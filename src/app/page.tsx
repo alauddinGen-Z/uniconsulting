@@ -48,7 +48,7 @@ export default function Home() {
           className="bg-white/80 backdrop-blur-md border border-white/50 shadow-lg shadow-orange-500/5 rounded-full px-6 py-3 flex items-center gap-8"
         >
           <div className="flex items-center gap-2">
-            <Image src="/logo-full.png" alt="UNI CONSULTING" width={180} height={40} className="h-10 w-auto" priority />
+            <Image src="/logo.png" alt="UNI" width={48} height={48} className="rounded-xl shadow-brand" priority />
           </div>
 
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
