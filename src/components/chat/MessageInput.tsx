@@ -8,6 +8,7 @@ interface MessageInputProps {
     onChange: (value: string) => void;
     onSend: () => void;
     isSending: boolean;
+    onTyping?: (isTyping: boolean) => void;
     placeholder?: string;
 }
 
@@ -16,8 +17,24 @@ export default function MessageInput({
     onChange,
     onSend,
     isSending,
+    onTyping,
     placeholder = "Type a message..."
 }: MessageInputProps) {
+    // Typing state logic
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.value;
+        onChange(newValue);
+
+        if (onTyping) {
+            onTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                onTyping(false);
+            }, 2000);
+        }
+    };
     // Voice-to-Text State
     const [isListening, setIsListening] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(false);
@@ -77,7 +94,7 @@ export default function MessageInput({
                 <input
                     type="text"
                     value={value}
-                    onChange={(e) => onChange(e.target.value)}
+                    onChange={handleInputChange}
                     onKeyPress={(e) => e.key === 'Enter' && onSend()}
                     placeholder={isListening ? "Listening..." : placeholder}
                     className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 border border-slate-200"

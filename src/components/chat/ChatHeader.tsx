@@ -14,6 +14,7 @@ interface ChatHeaderProps {
     onCopyChat: () => void;
     onClearMessages?: () => void;
     onLeaveGroup?: () => void;
+    typingUsers?: string[];
 }
 
 export default function ChatHeader({
@@ -25,7 +26,8 @@ export default function ChatHeader({
     onToggleSearch,
     onCopyChat,
     onClearMessages,
-    onLeaveGroup
+    onLeaveGroup,
+    typingUsers
 }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [localQuery, setLocalQuery] = useState("");
@@ -66,9 +68,17 @@ export default function ChatHeader({
                 </div>
                 <div>
                     <h3 className="font-bold text-slate-800">{conversation.name}</h3>
-                    <p className="text-xs text-slate-500">
-                        {conversation.type === 'group' ? 'Group Chat' : 'Direct Message'}
-                    </p>
+                    {typingUsers && typingUsers.length > 0 ? (
+                        <p className="text-xs text-orange-500 animate-pulse font-medium">
+                            {typingUsers.length === 1
+                                ? `${typingUsers[0]} is typing...`
+                                : `${typingUsers.length} people are typing...`}
+                        </p>
+                    ) : (
+                        <p className="text-xs text-slate-500">
+                            {conversation.type === 'group' ? 'Group Chat' : 'Direct Message'}
+                        </p>
+                    )}
                 </div>
             </div>
 
