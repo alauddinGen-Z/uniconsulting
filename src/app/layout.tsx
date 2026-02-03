@@ -24,6 +24,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: `${ACTIVE_THEME.branding.logoText} - Education Portal`,
   description: `${ACTIVE_THEME.name} - Production-grade Agency CRM for university applications.`,
+  icons: {
+    icon: "/logo-icon.png",
+    shortcut: "/logo-icon.png",
+    apple: "/logo-icon.png",
+  },
 };
 
 // Theme class mapping

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, GraduationCap, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import ParticlesBackground from "@/components/shared/ParticlesBackground";
 
 
@@ -226,6 +227,9 @@ export default function LoginPage() {
             </Link>
 
             <div className="glass-panel w-full max-w-md p-8 space-y-8 bg-white shadow-2xl rounded-3xl border border-white/50">
+                <div className="flex flex-col items-center justify-center space-y-4 mb-2">
+                    <Image src="/logo-full.png" alt="UNI CONSULTING" width={200} height={50} className="h-12 w-auto" priority />
+                </div>
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-black font-montserrat text-slate-900">
                         {isSignUp ? "JOIN UNI HUB" : "WELCOME BACK"}

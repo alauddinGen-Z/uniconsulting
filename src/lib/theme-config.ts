@@ -96,9 +96,9 @@ export const UNICONSULTING_THEME: ThemeConfig = {
         overlay: '#334155',   // Slate-700
     },
     branding: {
-        logoText: 'UNI',
+        logoText: 'UNICONSULTING',
         logoIcon: 'U',
-        tagline: 'Student Portal',
+        tagline: 'Global Student Success',
     },
 };
 
